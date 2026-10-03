@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "target": "ES2024",
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": [],
+    "strict": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "allowJs": true,
+    "checkJs": true,
+    "outDir": "node_modules/.tsc/web",
+    "paths": {
+      "$lib": ["./src/renderer/src/lib"],
+      "$lib/*": ["./src/renderer/src/lib/*"]
+    }
+  },
+  "include": [
+    "src/renderer/src/**/*.ts",
+    "src/renderer/src/**/*.js",
+    "src/renderer/src/**/*.svelte",
+    "src/preload/*.d.ts",
+    "src/shared/**/*.ts"
+  ]
+}
