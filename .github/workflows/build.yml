@@ -1,14 +1,20 @@
 name: Build
 
+# The single definition of how agenteque is packaged. ci.yml calls it for every
+# pull request and release.yml for every v* tag, so a release ships exactly
+# what the pull request already built.
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  workflow_call:
+    inputs:
+      label:
+        description: Goes into every file name, e.g. v0.0.1 or pr-12
+        required: true
+        type: string
+      retention-days:
+        description: How long the packages stay downloadable from the run
+        required: false
+        type: number
+        default: 7
 
 permissions:
   contents: read
@@ -17,28 +23,12 @@ defaults:
   run:
     shell: bash
 
+env:
+  # File names only. Kept out of the script text so a label cannot break the shell.
+  LABEL: ${{ inputs.label }}
+
 jobs:
-  checks:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v5
-
-      - uses: pnpm/action-setup@v5
-
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm lint
-      - run: pnpm fmt:check
-      - run: pnpm check
-      - run: pnpm test
-      - run: pnpm build
-
   package:
-    needs: checks
     name: package (${{ matrix.platform }})
     runs-on: ${{ matrix.os }}
     strategy:
@@ -53,12 +43,18 @@ jobs:
             platform: macos
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      # electron-builder skips signing whenever GITHUB_BASE_REF is set. The mac
+      # signature is ad-hoc and uses no certificate or secret, so pull requests
+      # sign exactly like releases.
+      CSC_FOR_PULL_REQUEST: 'true'
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
           cache: pnpm
@@ -72,25 +68,61 @@ jobs:
       - name: Package
         run: pnpm dist -- --publish never
 
-      - name: Verify artifacts
+      # Apple Silicon refuses to run unsigned code; electron-builder signs the
+      # app ad-hoc (mac.identity "-"). Gatekeeper still asks on first open
+      # because the app is not notarized.
+      - name: Check the macOS signature
+        if: matrix.platform == 'macos'
+        run: |
+          app="dist/mac-arm64/agenteque.app"
+          codesign --verify --deep --strict --verbose=2 "$app"
+          codesign --display --verbose=2 "$app"
+
+      # Electron is prebuilt, so the runner's glibc says nothing about the
+      # oldest one the Linux packages run on. The release notes quote this value.
+      - name: Check the glibc requirement
+        if: matrix.platform == 'linux'
+        env:
+          GLIBC_DOCUMENTED: '2.25'
+        run: |
+          set -euo pipefail
+          required="$(objdump -T dist/linux-unpacked/agenteque | grep -o 'GLIBC_[0-9.]*' | sed 's/GLIBC_//' | sort -uV | tail -n 1)"
+          echo "The packaged binary needs glibc $required (documented: $GLIBC_DOCUMENTED)"
+          if [ "$(printf '%s\n%s\n' "$required" "$GLIBC_DOCUMENTED" | sort -V | tail -n 1)" != "$GLIBC_DOCUMENTED" ]; then
+            echo "::error::glibc $required is newer than the documented $GLIBC_DOCUMENTED; update docs/HOW-TO-CHANGELOG.md, the release notes and GLIBC_DOCUMENTED"
+            exit 1
+          fi
+
+      # electron-builder.yml keeps its own names so local builds stay the same;
+      # only the published files carry the label.
+      - name: Rename and verify artifacts
         env:
           PLATFORM: ${{ matrix.platform }}
         run: |
           set -euo pipefail
+          version="$(node -p "require('./package.json').version")"
           case "$PLATFORM" in
             linux)
-              files=(
-                "agenteque-0.0.1-amd64.deb"
-                "agenteque-0.0.1-x86_64.rpm"
-                "agenteque-0.0.1-x86_64.AppImage"
-                "agenteque-0.0.1-x64.tar.gz"
+              built=(
+                "agenteque-$version-x86_64.AppImage"
+                "agenteque-$version-amd64.deb"
+                "agenteque-$version-x86_64.rpm"
+                "agenteque-$version-x64.tar.gz"
+              )
+              renamed=(
+                "agenteque-$LABEL-x86_64.AppImage"
+                "agenteque-$LABEL-x86_64.deb"
+                "agenteque-$LABEL-x86_64.rpm"
+                "agenteque-$LABEL-x86_64-linux.tar.gz"
               )
               ;;
             windows)
-              files=("agenteque 0.0.1.exe")
+              built=("agenteque $version.exe")
+              renamed=("agenteque-$LABEL-x86_64-windows-portable.exe")
               ;;
             macos)
-              files=("agenteque-0.0.1-arm64.dmg")
+              built=("agenteque-$version-arm64.dmg")
+              renamed=("agenteque-$LABEL-macos-arm64.dmg")
               ;;
             *)
               echo "Unknown platform: $PLATFORM"
@@ -102,26 +134,21 @@ jobs:
           ls -la dist/
 
           missing=0
-          for f in "${files[@]}"; do
-            if [[ ! -f "dist/$f" ]]; then
-              echo "MISSING: $f"
+          for i in "${!built[@]}"; do
+            if [[ ! -s "dist/${built[$i]}" ]]; then
+              echo "MISSING: ${built[$i]}"
               missing=1
-            else
-              echo "OK: $f ($(wc -c < "dist/$f") bytes)"
+              continue
             fi
+            mv "dist/${built[$i]}" "dist/${renamed[$i]}"
+            echo "OK: ${renamed[$i]} ($(wc -c < "dist/${renamed[$i]}") bytes)"
           done
           exit "$missing"
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: agenteque-${{ matrix.platform }}
-          path: |
-            dist/*.deb
-            dist/*.rpm
-            dist/*.AppImage
-            dist/*.tar.gz
-            dist/*.exe
-            dist/*.dmg
+          name: agenteque-${{ inputs.label }}-${{ matrix.platform }}
+          path: dist/agenteque-${{ inputs.label }}-*
           if-no-files-found: error
-          retention-days: 7
+          retention-days: ${{ inputs.retention-days }}
