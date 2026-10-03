@@ -135,13 +135,38 @@ jobs:
 
           missing=0
           for i in "${!built[@]}"; do
-            if [[ ! -s "dist/${built[$i]}" ]]; then
+            src="dist/${built[$i]}"
+            dest="dist/${renamed[$i]}"
+            if [[ -L "$src" || ! -f "$src" || ! -s "$src" ]]; then
               echo "MISSING: ${built[$i]}"
               missing=1
               continue
             fi
             mv "dist/${built[$i]}" "dist/${renamed[$i]}"
-            echo "OK: ${renamed[$i]} ($(wc -c < "dist/${renamed[$i]}") bytes)"
+            if ! bytes="$(wc -c < "$dest" | tr -d '[:space:]')"; then
+              echo "UNREADABLE: ${renamed[$i]}"
+              missing=1
+              continue
+            fi
+            echo "OK: ${renamed[$i]} (${bytes} bytes)"
+          done
+
+          prefix="agenteque-${LABEL}-"
+          shopt -s nullglob
+          for path in dist/*; do
+            base="${path#dist/}"
+            [[ "$base" == "$prefix"* ]] || continue
+            known=0
+            for name in "${renamed[@]}"; do
+              if [[ "$base" == "$name" ]]; then
+                known=1
+                break
+              fi
+            done
+            if [[ "$known" -ne 1 || -L "$path" || ! -f "$path" || ! -s "$path" ]]; then
+              echo "UNEXPECTED: $base"
+              missing=1
+            fi
           done
           exit "$missing"
 

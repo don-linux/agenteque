@@ -5,8 +5,7 @@
  * the step. An extra name that matches the upload glob must not be published,
  * and a directory or symlink must not count as a package.
  *
- * Extra publishable names, directories, and symlinks are accepted today, so
- * those cases stay `it.fails` until the step rejects them.
+ * An extra publishable name, a directory, or a symlink must fail the step.
  */
 import {
   existsSync,
@@ -34,10 +33,9 @@ declare module 'vitest' {
 const ADV_G05 = { id: 'ADV-G05' } as const
 
 /**
- * `[ -s ]` is true for a directory only when st_size > 0. On this filesystem
- * an empty directory is 4096 bytes, so the step accepts it and the case
- * stays `it.fails`. A zero-size directory is already rejected, so that
- * registration runs and the `it.fails` one is skipped.
+ * Empty directories report st_size > 0 on some filesystems and 0 on others.
+ * Each registration covers one of those sizes. The step must reject the
+ * directory in both cases.
  */
 function emptyDirectorySize(): number {
   const root = mkdtempSync(resolve(tmpdir(), 'agenteque-g05-dir-'))
@@ -217,7 +215,7 @@ it('rejects an empty artifact', async () => {
   }
 })
 
-it.fails('ADV-G05 rejects an extra publishable artifact', { meta: ADV_G05 }, async () => {
+it('ADV-G05 rejects an extra publishable artifact', { meta: ADV_G05 }, async () => {
   const problems: string[] = []
 
   for (const platform of PLATFORMS) {
@@ -269,7 +267,7 @@ async function directoryArtifactProblems(): Promise<string[]> {
   return problems
 }
 
-it.skipIf(!directoryLooksNonEmpty).fails(
+it.skipIf(!directoryLooksNonEmpty)(
   'ADV-G05 rejects a directory in place of an artifact',
   { meta: ADV_G05 },
   async () => {
@@ -287,7 +285,7 @@ it.skipIf(directoryLooksNonEmpty)(
   },
 )
 
-it.fails('ADV-G05 rejects a symlink in place of an artifact', { meta: ADV_G05 }, async () => {
+it('ADV-G05 rejects a symlink in place of an artifact', { meta: ADV_G05 }, async () => {
   const problems: string[] = []
 
   for (const platform of PLATFORMS) {
