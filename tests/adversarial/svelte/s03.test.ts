@@ -57,7 +57,7 @@ function deferredVersions(): {
   return { promise, resolve }
 }
 
-it('signals renderer ready only after getVersions fulfills', async () => {
+it('signals renderer ready on mount while getVersions is still pending', async () => {
   const pending = deferredVersions()
   const calls: string[] = []
   const mounted = await mountComponent(App, {
@@ -73,21 +73,24 @@ it('signals renderer ready only after getVersions fulfills', async () => {
   })
 
   try {
-    expect(calls).toEqual(['getVersions'])
+    expect(calls).toEqual(['notifyRendererReady', 'getVersions'])
     expect(mounted.target.textContent).toContain('Loading')
+    expect(mounted.target.textContent).not.toContain('9.9.9')
     await new Promise((resolve) => setTimeout(resolve, 0))
-    expect(calls).toEqual(['getVersions'])
+    expect(calls).toEqual(['notifyRendererReady', 'getVersions'])
+    expect(mounted.target.textContent).toContain('Loading')
+    expect(mounted.target.textContent).not.toContain('9.9.9')
 
     pending.resolve(versions)
-    await expect.poll(() => calls).toEqual(['getVersions', 'notifyRendererReady'])
     await expect.poll(() => mounted.target.textContent).toContain('9.9.9')
     expect(mounted.target.textContent).not.toContain('Loading')
+    expect(calls.filter((call) => call === 'notifyRendererReady')).toEqual(['notifyRendererReady'])
   } finally {
     await mounted.unmount()
   }
 })
 
-it.fails('ADV-S03 does not signal renderer ready when unmounted before getVersions settles', async () => {
+it('ADV-S03 does not render versions or signal ready again after unmount', async () => {
   const pending = deferredVersions()
   const visible = writable(true)
   let ready = 0
@@ -103,18 +106,18 @@ it.fails('ADV-S03 does not signal renderer ready when unmounted before getVersio
 
   try {
     expect(mounted.target.textContent).toContain('Loading')
-    expect(ready).toBe(0)
+    expect(ready).toBe(1)
 
     visible.set(false)
     mounted.flush()
     expect(mounted.target.textContent).not.toContain('agenteque')
-    expect(ready).toBe(0)
+    expect(ready).toBe(1)
 
     pending.resolve(versions)
     await new Promise((resolve) => setTimeout(resolve, 0))
     mounted.flush()
     expect(mounted.target.textContent).not.toContain('9.9.9')
-    expect(ready).toBe(0)
+    expect(ready).toBe(1)
   } finally {
     await mounted.unmount()
   }

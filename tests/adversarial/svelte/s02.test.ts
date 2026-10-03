@@ -30,20 +30,15 @@ interface SettledVersions {
 }
 
 /**
- * `notifyRendererReady` runs synchronously after the versions assignment and
- * before Svelte's queued render. Flushing there runs that render inside
- * `flushSync`, so a throw stays on this stack instead of escaping later.
+ * `notifyRendererReady` runs on mount, before versions exist. Counting that
+ * call must not flush: the payload is not assigned yet. After it resolves,
+ * flush here so a render throw stays on this stack.
  */
 async function settleVersions(payload: unknown): Promise<SettledVersions> {
   let readyCount = 0
   let renderError: unknown
   let resolveVersions!: (value: unknown) => void
-  let markReady!: () => void
-  let mounted: MountedComponent | undefined
-  const ready = new Promise<void>((resolve) => {
-    markReady = resolve
-  })
-  mounted = await mountComponent(App, {
+  const mounted = await mountComponent(App, {
     api: {
       getVersions: () =>
         new Promise((resolve) => {
@@ -51,20 +46,17 @@ async function settleVersions(payload: unknown): Promise<SettledVersions> {
         }),
       notifyRendererReady: () => {
         readyCount += 1
-        try {
-          if (!mounted) throw new Error('versions resolved before mount')
-          mounted.flush()
-        } catch (error) {
-          renderError = error
-        }
-        markReady()
       },
     },
   })
 
   resolveVersions(payload)
-  await ready
-  if (!mounted) throw new Error('versions resolved before mount')
+  await Promise.resolve()
+  try {
+    mounted.flush()
+  } catch (error) {
+    renderError = error
+  }
   return { mounted, readyCount, renderError }
 }
 
