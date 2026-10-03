@@ -13,6 +13,12 @@ export default defineConfig({
     },
   },
   renderer: {
+    build: {
+      // Un subconjunto de fuente pequeño se inlinearía como `data:`, y la CSP
+      // del renderer no tiene `font-src`: cae en `default-src 'self'` y
+      // Chromium bloquea la carga. Que viajen siempre como fichero.
+      assetsInlineLimit: (filePath: string) => (/\.woff2?$/i.test(filePath) ? false : undefined),
+    },
     resolve: {
       alias: {
         $lib: resolve(import.meta.dirname, 'src/renderer/src/lib'),

@@ -9,6 +9,20 @@ import { join } from 'node:path'
 import { expect, it } from 'vitest'
 import { launchApp, type LaunchedElectronApp, openVersionsPanel } from '../helpers/electron'
 
+/** Todo lo que el preload expone; nada más puede cruzar el contextBridge. */
+const BRIDGE_KEYS = [
+  'platform',
+  'getVersions',
+  'notifyRendererReady',
+  'loadConfig',
+  'saveTerminalSettings',
+  'saveAppearanceSettings',
+  'saveLayoutSettings',
+  'saveWorkspaceView',
+  'recordRecentFolder',
+  'removeRecentFolder',
+] as readonly string[]
+
 const SENTINEL = 'ADV-E10-SENTINEL'
 const FLOOD_COUNT = 10_000
 const READY_COUNT = 10_000
@@ -413,7 +427,9 @@ it('ADV-E10 unknown channels fail', async () => {
     expect(surface.missing, 'window.api missing').toBe(false)
     if (surface.missing) return
     expect(surface.globals).toEqual([])
-    expect(surface.keys.toSorted()).toEqual(['getVersions', 'notifyRendererReady'])
+    expect(surface.keys).toContain('getVersions')
+    expect(surface.keys).toContain('notifyRendererReady')
+    expect(surface.keys.filter((key) => !BRIDGE_KEYS.includes(key))).toEqual([])
     expectVersions(surface.channelArg, versions)
     expect(surface.polluted).toBe(false)
 
