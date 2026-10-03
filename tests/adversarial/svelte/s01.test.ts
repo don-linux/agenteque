@@ -41,7 +41,7 @@ async function finish(mounted: MountedComponent, stop: () => void): Promise<void
   }
 }
 
-it.fails('ADV-S01 calls notifyRendererReady when getVersions rejects', async () => {
+it('ADV-S01 calls notifyRendererReady when getVersions rejects', async () => {
   const unhandled = captureUnhandledRejections()
   let ready = 0
   const mounted = await mountComponent(App, {
@@ -63,7 +63,7 @@ it.fails('ADV-S01 calls notifyRendererReady when getVersions rejects', async () 
   }
 })
 
-it.fails('ADV-S01 calls notifyRendererReady when getVersions never resolves', async () => {
+it('ADV-S01 calls notifyRendererReady when getVersions never resolves', async () => {
   const unhandled = captureUnhandledRejections()
   let ready = 0
   const mounted = await mountComponent(App, {

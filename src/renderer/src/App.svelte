@@ -5,9 +5,16 @@
 
   let versions = $state<AppVersions | null>(null)
 
-  onMount(async () => {
-    versions = await window.api.getVersions()
+  onMount(() => {
     window.api.notifyRendererReady()
+    void Promise.resolve(window.api.getVersions()).then(
+      (loaded) => {
+        versions = loaded
+      },
+      () => {
+        versions = null
+      },
+    )
   })
 </script>
 
