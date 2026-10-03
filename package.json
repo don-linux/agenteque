@@ -17,7 +17,8 @@
     "check": "svelte-check --tsconfig ./tsconfig.web.json && tsc --noEmit -p tsconfig.node.json",
     "test": "vitest run --project unit",
     "test:build": "vitest run --project build",
-    "dist": "electron-vite build && electron-builder"
+    "dist": "electron-vite build && electron-builder",
+    "postinstall": "install-electron"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "7.3.1",
