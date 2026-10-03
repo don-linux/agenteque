@@ -37,6 +37,7 @@ jobs:
       - run: pnpm fmt:check
       - run: pnpm check
       - run: pnpm test
+      - run: xvfb-run -a pnpm test:adversarial
       - run: pnpm build
 
   build:
