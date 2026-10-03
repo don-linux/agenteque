@@ -1,10 +1,7 @@
 /**
  * ADV-E18. The renderer must not read the OS clipboard without a grant, and an
  * `<a download>` must not write a file on a path this test did not expect.
- * There is no `setPermissionRequestHandler` and no `will-download` handler.
- * Clipboard read is granted today, and `<a download>` spools bytes into the
- * home directory before any save dialog is confirmed. Those cases stay
- * `it.fails` until the read is denied and the download writes nothing.
+ * The test never chooses a save directory and never confirms a dialog.
  */
 import { randomUUID } from 'node:crypto'
 import { readdir, readFile, rm, stat } from 'node:fs/promises'
@@ -49,7 +46,7 @@ const SKIP_DIRS = new Set([
   'DawnWebGPUCache',
 ])
 
-it.fails(
+it(
   'ADV-E18 renderer does not read the OS clipboard without a grant',
   { meta: ADV_E18 },
   async () => {
@@ -88,45 +85,41 @@ it.fails(
   },
 )
 
-it.fails(
-  'ADV-E18 <a download> blob does not write an unexpected file',
-  { meta: ADV_E18 },
-  async () => {
-    const id = randomUUID()
-    const payload = `ADV-E18-${id}`
-    const filename = `adv-e18-${id}.txt`
-    const launched = await launchApp()
-    const window = launched.window
-    if (!window) throw new Error('app did not open a window')
+it('ADV-E18 <a download> blob does not write an unexpected file', { meta: ADV_E18 }, async () => {
+  const id = randomUUID()
+  const payload = `ADV-E18-${id}`
+  const filename = `adv-e18-${id}.txt`
+  const launched = await launchApp()
+  const window = launched.window
+  if (!window) throw new Error('app did not open a window')
 
-    let files: string[] = []
-    try {
-      await window.locator('h1').waitFor()
-      const observed = await triggerDownload(launched, window, id, async () => {
-        await window.evaluate(
-          ({ body, name }) => {
-            const view = globalThis as BlobPage
-            const blob = new view.Blob([body], { type: 'text/plain' })
-            const anchor = view.document.createElement('a')
-            anchor.id = 'e18-download'
-            anchor.href = view.URL.createObjectURL(blob)
-            anchor.download = `../../${name}`
-            anchor.textContent = 'download'
-            view.document.body.append(anchor)
-          },
-          { body: payload, name: filename },
-        )
-      })
-      files = observed.files
-      expect(downloadViolations(observed, id), describeDownload(observed)).toEqual([])
-    } finally {
-      await rmFound(files)
-      await launched.close()
-    }
-  },
-)
+  let files: string[] = []
+  try {
+    await window.locator('h1').waitFor()
+    const observed = await triggerDownload(launched, window, id, async () => {
+      await window.evaluate(
+        ({ body, name }) => {
+          const view = globalThis as BlobPage
+          const blob = new view.Blob([body], { type: 'text/plain' })
+          const anchor = view.document.createElement('a')
+          anchor.id = 'e18-download'
+          anchor.href = view.URL.createObjectURL(blob)
+          anchor.download = `../../${name}`
+          anchor.textContent = 'download'
+          view.document.body.append(anchor)
+        },
+        { body: payload, name: filename },
+      )
+    })
+    files = observed.files
+    expect(downloadViolations(observed, id), describeDownload(observed)).toEqual([])
+  } finally {
+    await rmFound(files)
+    await launched.close()
+  }
+})
 
-it.fails(
+it(
   'ADV-E18 <a download> from 127.0.0.1 does not write an unexpected file',
   { meta: ADV_E18 },
   async () => {

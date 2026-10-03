@@ -1,3 +1,4 @@
+import { readdirSync, unlinkSync } from 'node:fs'
 import { join, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { app, BrowserWindow, ipcMain, session, shell, type WebFrameMain } from 'electron'
@@ -8,6 +9,24 @@ const SMOKE_TIMEOUT_MS = 20_000
 const SMOKE_HOLD_MS = 2_000
 const MAX_EXTERNAL_URL_LENGTH = 2048
 const MAX_EXTERNAL_OPENS = 8
+const clipboardDenied = new Set<string>(['clipboard-read', 'deprecated-sync-clipboard-read'])
+const chromiumSpoolPrefix = '.org.chromium.Chromium.'
+const SPOOL_SWEEP_MS = 800
+const SPOOL_SWEEP_STEP_MS = 20
+
+/**
+ * Camera and microphone share `media`. MIDI sysex is a separate check from
+ * `midi`. Approximate geolocation is the same capability as geolocation.
+ * Clipboard reads are denied separately by ADV-E18.
+ */
+const DENIED_PERMISSIONS = new Set<string>([
+  'media',
+  'geolocation',
+  'geolocation-approximate',
+  'notifications',
+  'midi',
+  'midiSysex',
+])
 
 function externalUrlAllowed(raw: string): boolean {
   if (raw.length > MAX_EXTERNAL_URL_LENGTH) return false
@@ -46,32 +65,6 @@ function installNavigationGuard(contents: Electron.WebContents): void {
   contents.on('will-frame-navigate', (event) => {
     if (event.isMainFrame) confine(event)
   })
-}
-
-/**
- * Camera and microphone share `media`. MIDI sysex is a separate check from
- * `midi`. Approximate geolocation is the same capability as geolocation.
- */
-const DENIED_PERMISSIONS = new Set<string>([
-  'media',
-  'geolocation',
-  'geolocation-approximate',
-  'notifications',
-  'midi',
-  'midiSysex',
-])
-
-function denyDevicePermissions(): void {
-  const ses = session.defaultSession
-  ses.setPermissionRequestHandler((_contents, permission, callback) => {
-    callback(!DENIED_PERMISSIONS.has(permission))
-  })
-  ses.setPermissionCheckHandler((_contents, permission) => {
-    // Electron's default check allows every permission except this one.
-    if (permission === 'deprecated-sync-clipboard-read') return false
-    return !DENIED_PERMISSIONS.has(permission)
-  })
-  ses.setDevicePermissionHandler(() => false)
 }
 
 function createWindow(): BrowserWindow {
@@ -126,6 +119,51 @@ function isTrustedSender(frame: WebFrameMain | null): boolean {
   const rendererRoot = join(__dirname, '../renderer') + sep
   const path = fileURLToPath(url)
   return path.startsWith(rendererRoot)
+}
+
+function installSessionGuards(): void {
+  const ses = session.defaultSession
+  const denied = (permission: string): boolean =>
+    DENIED_PERMISSIONS.has(permission) || clipboardDenied.has(permission)
+  ses.setPermissionRequestHandler((_contents, permission, callback) => {
+    callback(!denied(permission))
+  })
+  ses.setPermissionCheckHandler((_contents, permission) => !denied(permission))
+  ses.setDevicePermissionHandler(() => false)
+  ses.on('will-download', (event, item) => {
+    event.preventDefault()
+    item.cancel()
+    discardChromiumSpools()
+  })
+}
+
+function discardChromiumSpools(): void {
+  const dirs = [...new Set([app.getPath('downloads'), app.getPath('temp')])]
+  const sweep = (): void => {
+    for (const dir of dirs) unlinkChromiumSpools(dir)
+  }
+  sweep()
+  for (let delayMs = 0; delayMs <= SPOOL_SWEEP_MS; delayMs += SPOOL_SWEEP_STEP_MS) {
+    const timer = setTimeout(sweep, delayMs)
+    timer.unref()
+  }
+}
+
+function unlinkChromiumSpools(dir: string): void {
+  let names: string[]
+  try {
+    names = readdirSync(dir)
+  } catch {
+    return
+  }
+  for (const name of names) {
+    if (!name.startsWith(chromiumSpoolPrefix)) continue
+    try {
+      unlinkSync(join(dir, name))
+    } catch {
+      // The spool can disappear between the listing and the unlink.
+    }
+  }
 }
 
 function registerIpcHandlers(): void {
@@ -207,7 +245,7 @@ function armSmokeTest(win: BrowserWindow): void {
 }
 
 void app.whenReady().then(() => {
-  denyDevicePermissions()
+  installSessionGuards()
   registerIpcHandlers()
   const win = createWindow()
   if (isSmokeTest) armSmokeTest(win)
