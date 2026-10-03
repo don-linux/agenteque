@@ -1,10 +1,7 @@
 /**
  * ADV-E04. A 302, a meta refresh, a form submit, and history must not move
- * the main window onto an external origin. There is no will-navigate or
- * will-redirect handler. The form case stays because the renderer CSP sets
- * form-action 'none'. The other cases leave the app today and stay
- * `it.fails` until the window remains on its page. When a case starts
- * passing, drop `it.fails` so the assertion guards the fix.
+ * the main window onto an external origin. The navigation guard cancels
+ * those main-frame navigations, including redirects.
  */
 import { setTimeout as delay } from 'node:timers/promises'
 import type { ElectronApplication, Page } from 'playwright'
@@ -35,14 +32,14 @@ interface Observation {
   apiExposed: boolean
 }
 
-it.fails('ADV-E04 main window does not follow an HTTP 302', { meta: ADV_E04 }, async () => {
+it('ADV-E04 main window does not follow an HTTP 302', { meta: ADV_E04 }, async () => {
   const observed = await attack('landed-302', (page, origin) =>
     page.evaluate(assignLocation, `${origin}/redirect`),
   )
   expect(observed).toEqual(stayedOnApp(observed))
 })
 
-it.fails('ADV-E04 main window does not follow a meta refresh', { meta: ADV_E04 }, async () => {
+it('ADV-E04 main window does not follow a meta refresh', { meta: ADV_E04 }, async () => {
   const observed = await attack('landed-meta', (page, origin) =>
     page.evaluate(installMetaRefresh, `${origin}/meta`),
   )
@@ -56,7 +53,7 @@ it('ADV-E04 main window does not follow a form submit', { meta: ADV_E04 }, async
   expect(observed).toEqual(stayedOnApp(observed))
 })
 
-it.fails(
+it(
   'ADV-E04 main window does not follow history back to an external origin',
   { meta: ADV_E04 },
   async () => {

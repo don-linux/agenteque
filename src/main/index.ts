@@ -22,6 +22,31 @@ function externalUrlAllowed(raw: string): boolean {
   return true
 }
 
+function installNavigationGuard(contents: Electron.WebContents): void {
+  const devOrigin = process.env.ELECTRON_RENDERER_URL
+    ? new URL(process.env.ELECTRON_RENDERER_URL).origin
+    : null
+
+  const confine = (event: Electron.Event<{ url: string }>): void => {
+    let next: URL
+    try {
+      next = new URL(event.url)
+    } catch {
+      event.preventDefault()
+      return
+    }
+    if (devOrigin !== null && next.origin === devOrigin) return
+    if (next.href === contents.getURL()) return
+    event.preventDefault()
+  }
+
+  contents.on('will-navigate', confine)
+  contents.on('will-redirect', confine)
+  contents.on('will-frame-navigate', (event) => {
+    if (event.isMainFrame) confine(event)
+  })
+}
+
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 960,
@@ -46,6 +71,8 @@ function createWindow(): BrowserWindow {
     }
     return { action: 'deny' }
   })
+
+  installNavigationGuard(win.webContents)
 
   if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) {
     void win.loadURL(process.env.ELECTRON_RENDERER_URL)
