@@ -20,6 +20,7 @@ import {
   packagedExecutable,
   type LaunchedElectronApp,
 } from '../helpers/electron'
+import { root } from '../helpers/paths'
 
 declare module 'vitest' {
   interface TaskMeta {
@@ -34,7 +35,8 @@ const TAGLINE = 'Abre una carpeta para ver y editar sus archivos markdown.'
 const TAMPERED_TAGLINE = 'E20 TAMPERED ASAR PAYLOAD'.padEnd(TAGLINE.length, '!')
 const HOSTILE_MARKER = 'E20-HOSTILE-APP-DIR'
 const HOSTILE_VERSION = '9.9.9'
-const REAL_VERSION = '0.0.1'
+// Electron reports this field from the packaged package.json.
+const REAL_VERSION = readPackageVersion()
 
 interface PackagedSnapshot {
   appPath: string
@@ -113,6 +115,15 @@ it.fails('ADV-E20 does not execute a modified app.asar', { meta: ADV_E20 }, asyn
     })
   })
 })
+
+function readPackageVersion(): string {
+  const manifestPath = join(root, 'package.json')
+  const parsed = JSON.parse(readFileSync(manifestPath, 'utf8')) as { version?: unknown }
+  if (typeof parsed.version !== 'string' || parsed.version.length === 0) {
+    throw new Error(`${manifestPath} has no version string`)
+  }
+  return parsed.version
+}
 
 function resourcesDir(): string {
   return join(dirname(packagedExecutable()), 'resources')
