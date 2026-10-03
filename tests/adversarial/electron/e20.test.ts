@@ -2,14 +2,15 @@
  * ADV-E20. A local writer must not replace the packaged app.
  *
  * Electron's default search is `app.asar`, then `resources/app`, then
- * `default_app.asar`. `OnlyLoadAppFromAsar` drops the unpacked directory.
- * `EnableEmbeddedAsarIntegrityValidation` rejects a modified archive on
- * macOS and Windows. This package sets neither fuse.
+ * `default_app.asar`. `onlyLoadAppFromAsar` drops the unpacked directory.
+ * `enableEmbeddedAsarIntegrityValidation` rejects a modified archive on
+ * macOS and Windows. This package sets both fuses.
  *
  * The intact-archive case stays a normal `it`: a sibling `resources/app`
- * must not win while `app.asar` still opens. The other two cases are
- * `it.fails` until the fuses are on. The byte-edit case cannot go green on
- * Linux: Electron compiles the integrity check out of Linux builds.
+ * must not win while `app.asar` still opens. Withholding `app.asar` is also
+ * a normal `it`: the directory fallback must not load. The byte-edit case
+ * stays `it.fails` on Linux: Electron compiles the integrity check out of
+ * Linux builds.
  */
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -64,37 +65,33 @@ it('does not prefer resources/app over an intact app.asar', async () => {
   })
 })
 
-it.fails(
-  'ADV-E20 does not load resources/app when app.asar is withheld',
-  { meta: ADV_E20 },
-  async () => {
-    await withoutAppAsar(async () => {
-      await withHostileApp(async () => {
-        const result = await launchPackaged()
-        const snap = result.status === 'window' ? result.snap : undefined
-        const message = result.status === 'refused' ? result.message : ''
-        expect({
-          refused: result.status === 'refused',
-          messageMentionsHostile:
-            message.includes(HOSTILE_MARKER) || message.includes(HOSTILE_VERSION),
-          appPath: snap?.appPath ?? '',
-          heading: snap?.heading ?? '',
-          version: snap?.version ?? '',
-          bodyHasHostile: snap?.body.includes(HOSTILE_MARKER) ?? false,
-          bodyHasTagline: snap?.body.includes(TAGLINE) ?? false,
-        }).toEqual({
-          refused: true,
-          messageMentionsHostile: false,
-          appPath: '',
-          heading: '',
-          version: '',
-          bodyHasHostile: false,
-          bodyHasTagline: false,
-        })
+it('ADV-E20 does not load resources/app when app.asar is withheld', { meta: ADV_E20 }, async () => {
+  await withoutAppAsar(async () => {
+    await withHostileApp(async () => {
+      const result = await launchPackaged()
+      const snap = result.status === 'window' ? result.snap : undefined
+      const message = result.status === 'refused' ? result.message : ''
+      expect({
+        refused: result.status === 'refused',
+        messageMentionsHostile:
+          message.includes(HOSTILE_MARKER) || message.includes(HOSTILE_VERSION),
+        appPath: snap?.appPath ?? '',
+        heading: snap?.heading ?? '',
+        version: snap?.version ?? '',
+        bodyHasHostile: snap?.body.includes(HOSTILE_MARKER) ?? false,
+        bodyHasTagline: snap?.body.includes(TAGLINE) ?? false,
+      }).toEqual({
+        refused: true,
+        messageMentionsHostile: false,
+        appPath: '',
+        heading: '',
+        version: '',
+        bodyHasHostile: false,
+        bodyHasTagline: false,
       })
     })
-  },
-)
+  })
+})
 
 it.fails('ADV-E20 does not execute a modified app.asar', { meta: ADV_E20 }, async () => {
   await withTamperedAsar(async () => {

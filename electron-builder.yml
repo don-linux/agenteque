@@ -11,6 +11,8 @@ afterPack: ./scripts/filter-packaged-argv.cjs
 electronFuses:
   runAsNode: false
   enableNodeOptionsEnvironmentVariable: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
 publish: null
 linux:
   executableName: agenteque
