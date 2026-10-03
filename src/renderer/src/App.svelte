@@ -1,99 +1,72 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import Counter from '$lib/Counter.svelte'
-  import type { AppVersions } from '../../shared/ipc'
+  import { appConfig } from '$lib/app-config.svelte'
+  import { ROUTES } from '$lib/app-routes'
+  import DeleteEntryModal from '$lib/components/DeleteEntryModal.svelte'
+  import FolderVisibilityModal from '$lib/components/FolderVisibilityModal.svelte'
+  import ToastHost from '$lib/components/ToastHost.svelte'
+  import UnsavedExitModal from '$lib/components/UnsavedExitModal.svelte'
+  import { isSettingsRoute } from '$lib/router'
+  import { router } from '$lib/router.svelte'
+  import HomeScreen from '$lib/screens/HomeScreen.svelte'
+  import SettingsScreen from '$lib/screens/SettingsScreen.svelte'
+  import WorkspaceScreen from '$lib/screens/WorkspaceScreen.svelte'
+  import { settingsEditor } from '$lib/settings-editor.svelte'
+  import { applyTheme } from '$lib/ui-theme'
+  import { workspace } from '$lib/workspace.svelte'
 
-  let versions = $state<AppVersions | null>(null)
+  let route = $derived(router.route)
+  let settings = $derived(isSettingsRoute(route))
+  // El guard de `/workspace`: sin carpeta abierta la ruta no tiene contenido.
+  let ide = $derived(route === ROUTES.workspace && workspace.root !== null)
 
-  function versionText(source: object, key: keyof AppVersions): string {
-    try {
-      const value = (source as Record<string, unknown>)[key]
-      if (typeof value === 'string') return value
-      if (value == null) return ''
-      if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
-        return String(value)
-      }
-      return String(value)
-    } catch {
-      return ''
-    }
-  }
+  $effect(() => {
+    applyTheme(document.documentElement, settingsEditor.uiTheme)
+  })
+
+  $effect(() => {
+    if (route !== ROUTES.workspace || workspace.root !== null) return
+    router.go(ROUTES.home)
+  })
 
   onMount(() => {
-    let cancelled = false
+    const stop = router.start()
     window.api.notifyRendererReady()
-    void Promise.resolve(window.api.getVersions()).then(
-      (loaded) => {
-        if (cancelled) return
-        versions = loaded
-      },
-      () => {
-        if (cancelled) return
-        versions = null
-      },
-    )
-    return () => {
-      cancelled = true
-    }
+    void appConfig.load()
+    return stop
   })
 </script>
 
-<main>
-  <h1>agenteque</h1>
-  <p class="tagline">Electron + Svelte 5 + Vite 8</p>
-
-  <div class="card">
-    <Counter />
-  </div>
-
-  <section class="versions" aria-label="Runtime versions">
-    <h2>Versions (via IPC)</h2>
-    {#if versions}
-      <ul>
-        <li>app <code>{versionText(versions, 'app')}</code></li>
-        <li>Electron <code>{versionText(versions, 'electron')}</code></li>
-        <li>Chromium <code>{versionText(versions, 'chrome')}</code></li>
-        <li>Node <code>{versionText(versions, 'node')}</code></li>
-      </ul>
+<div class="shell">
+  <div class="page">
+    {#if settings}
+      <SettingsScreen {route} />
+    {:else if ide}
+      <WorkspaceScreen />
     {:else}
-      <p>Loading…</p>
+      <HomeScreen />
     {/if}
-  </section>
-
-  <p class="hint">Edit <code>src/renderer/src/App.svelte</code> and save to test HMR.</p>
-</main>
+  </div>
+</div>
+<UnsavedExitModal />
+<FolderVisibilityModal />
+<DeleteEntryModal />
+<ToastHost />
 
 <style>
-  main {
-    max-width: 40rem;
-    margin: 0 auto;
-    padding: 3rem 1.5rem;
-    text-align: center;
+  .shell {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
   }
 
-  h1 {
-    font-size: 3rem;
-    margin: 0;
-  }
-
-  .tagline {
-    color: var(--muted);
-    margin-top: 0.25rem;
-  }
-
-  .card {
-    padding: 2rem 0;
-  }
-
-  .versions ul {
-    list-style: none;
-    padding: 0;
-    display: grid;
-    gap: 0.4rem;
-  }
-
-  .hint {
-    color: var(--muted);
-    font-size: 0.9rem;
+  .page {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
   }
 </style>

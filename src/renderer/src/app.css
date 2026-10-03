@@ -1,45 +1,62 @@
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/jetbrains-mono';
+
+/*
+ * Los valores de aquí son los de Idioteque Dark, el tema por defecto. En cuanto
+ * el renderer monta, `applyTheme` reescribe las mismas variables sobre <html>
+ * con el tema guardado; esta copia solo evita el destello del primer frame.
+ */
 :root {
-  --bg: #1b1b1f;
-  --fg: rgba(255, 255, 245, 0.87);
-  --muted: rgba(235, 235, 245, 0.6);
-  --accent: #ff3e00;
+  --bg: #1c1e22;
+  --surface: #24272d;
+  --surface-hover: #2c3038;
+  --border: #3a404a;
+  --text: #d2d5db;
+  --text-muted: #8f96a1;
+  --text-faint: #6a7080;
+  --accent: #7b9ee8;
+  --accent-soft: #7b9ee822;
+  --danger: #e08b99;
+  --shadow: #00000055;
+  --syntax-heading: #8eb0ee;
+  --syntax-comment: #6a7080;
+  --syntax-link: #7b9ee8;
+  --syntax-code: #c4a882;
+  --syntax-keyword: #7b9ee8;
+  --syntax-string: #c4a882;
+  --syntax-number: #e08b99;
+  --syntax-function: #8eb0ee;
+  --syntax-type: #c4a882;
+  --syntax-variable: #d2d5db;
+  --syntax-operator: #8f96a1;
+  --syntax-tag: #e08b99;
+  --syntax-invalid: #e08b99;
+  --graph-lane-0: #7b9ee8;
+  --graph-lane-1: #8ec4c4;
+  --graph-lane-2: #e8b17b;
+  --graph-lane-3: #b79ee8;
+  --graph-lane-4: #c4a882;
+  --graph-lane-5: #9ec48b;
+  --graph-lane-6: #c48bb7;
+  --graph-lane-7: #e08b99;
+  --font-ui: 'Inter Variable', Inter, system-ui, sans-serif;
+  --font-mono:
+    'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  --footer-height: 2.75rem;
+  --term-size: 280px;
 
   color-scheme: dark;
-  font-family:
-    system-ui,
-    -apple-system,
-    'Segoe UI',
-    Roboto,
-    sans-serif;
-  line-height: 1.5;
-  color: var(--fg);
-  background-color: var(--bg);
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
 }
 
 body {
-  margin: 0;
-  min-height: 100vh;
-}
-
-code {
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 4px;
-  padding: 0.1rem 0.35rem;
-}
-
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font: inherit;
-  font-weight: 500;
-  background-color: #2a2a30;
-  color: inherit;
-  cursor: pointer;
-  transition: border-color 0.2s;
-}
-
-button:hover {
-  border-color: var(--accent);
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
 }

@@ -19,5 +19,8 @@
     "src/preload/**/*.ts",
     "src/shared/**/*.ts",
     "tests/**/*.ts"
-  ]
+  ],
+  // Los tests unitarios ejercitan módulos del renderer: necesitan DOM y el
+  // alias `$lib`, así que los comprueba el proyecto web.
+  "exclude": ["tests/unit/**/*.ts"]
 }
