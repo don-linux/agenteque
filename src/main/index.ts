@@ -241,10 +241,10 @@ function armSmokeTest(win: BrowserWindow): void {
       .executeJavaScript(`document.querySelector('h1')?.textContent === 'agenteque'`)
       .then((mounted: unknown) => {
         if (settled) return
-        if (mounted !== true) {
-          finish(1, 'renderer-ready before the renderer mounted')
-          return
-        }
+        // A signal before the heading is mounted is not ready. Do not exit
+        // here: a crash in that same window must still surface as
+        // render-process-gone, and the smoke timeout still fails the run.
+        if (mounted !== true) return
         if (readyCount > 1) {
           // A second signal must not print OK. Exit after the same hold the
           // success path uses so the duplicate IPC can be observed first.
@@ -256,6 +256,10 @@ function armSmokeTest(win: BrowserWindow): void {
         hold = setTimeout(() => finish(0), SMOKE_HOLD_MS)
       })
       .catch((error: unknown) => {
+        if (settled) return
+        if (win.isDestroyed() || win.webContents.isDestroyed() || win.webContents.isCrashed()) {
+          return
+        }
         const message = error instanceof Error ? error.message : String(error)
         finish(1, `renderer-ready before the renderer mounted: ${message}`)
       })
