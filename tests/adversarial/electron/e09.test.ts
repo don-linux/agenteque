@@ -156,36 +156,32 @@ it('a foreign iframe must not receive app:versions', async () => {
 
 // The versions handler ignores senderFrame. After a top-level navigation the preload
 // still exposes window.api, so this assertion fails until untrusted origins are rejected.
-it.fails(
-  'ADV-E09 a foreign origin must not receive app:versions after navigation',
-  { tags: 'ADV-E09' },
-  async () => {
-    const { serverOrigin, launched, page } = await openApp()
-    await watchVersionSenders(launched.app)
-    const trusted = await probeOwnVersions(page)
-    expect(isVersionPayload(trusted.versions)).toBe(true)
+it.fails('ADV-E09 a foreign origin must not receive app:versions after navigation', async () => {
+  const { serverOrigin, launched, page } = await openApp()
+  await watchVersionSenders(launched.app)
+  const trusted = await probeOwnVersions(page)
+  expect(isVersionPayload(trusted.versions)).toBe(true)
 
-    await page.evaluate((next: string) => {
-      ;(globalThis as unknown as { location: { assign(url: string): void } }).location.assign(next)
-    }, `${serverOrigin}/nav`)
+  await page.evaluate((next: string) => {
+    ;(globalThis as unknown as { location: { assign(url: string): void } }).location.assign(next)
+  }, `${serverOrigin}/nav`)
 
-    let navigated = false
-    try {
-      await page.waitForURL((url) => url.origin === serverOrigin, { timeout: 10_000 })
-      navigated = true
-      await page.waitForLoadState('domcontentloaded')
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      if (!message.includes('Timeout')) throw error
-    }
+  let navigated = false
+  try {
+    await page.waitForURL((url) => url.origin === serverOrigin, { timeout: 10_000 })
+    navigated = true
+    await page.waitForLoadState('domcontentloaded')
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    if (!message.includes('Timeout')) throw error
+  }
 
-    const foreign = navigated
-      ? await probeOwnVersions(page)
-      : { exposed: false, versions: null, error: null }
-    const senders = navigated ? await versionSenders(launched.app) : []
-    expect(
-      isVersionPayload(foreign.versions),
-      `ADV-E09 ${page.url()} payload=${JSON.stringify(foreign)} senders=${JSON.stringify(senders)}`,
-    ).toBe(false)
-  },
-)
+  const foreign = navigated
+    ? await probeOwnVersions(page)
+    : { exposed: false, versions: null, error: null }
+  const senders = navigated ? await versionSenders(launched.app) : []
+  expect(
+    isVersionPayload(foreign.versions),
+    `ADV-E09 ${page.url()} payload=${JSON.stringify(foreign)} senders=${JSON.stringify(senders)}`,
+  ).toBe(false)
+})
