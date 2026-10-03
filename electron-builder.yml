@@ -6,6 +6,8 @@ directories:
 files:
   - out/**/*
 asar: true
+# Linux entry point filters hostile argv before Electron starts. See scripts/.
+afterPack: ./scripts/filter-packaged-argv.cjs
 publish: null
 linux:
   executableName: agenteque

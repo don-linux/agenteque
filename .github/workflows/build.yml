@@ -86,7 +86,12 @@ jobs:
           GLIBC_DOCUMENTED: '2.25'
         run: |
           set -euo pipefail
-          required="$(objdump -T dist/linux-unpacked/agenteque | grep -o 'GLIBC_[0-9.]*' | sed 's/GLIBC_//' | sort -uV | tail -n 1)"
+          # The shipped entry point is a shell filter. The Electron ELF is the sibling .bin.
+          binary=dist/linux-unpacked/agenteque
+          if [ -f dist/linux-unpacked/agenteque.bin ]; then
+            binary=dist/linux-unpacked/agenteque.bin
+          fi
+          required="$(objdump -T "$binary" | grep -o 'GLIBC_[0-9.]*' | sed 's/GLIBC_//' | sort -uV | tail -n 1)"
           echo "The packaged binary needs glibc $required (documented: $GLIBC_DOCUMENTED)"
           if [ "$(printf '%s\n%s\n' "$required" "$GLIBC_DOCUMENTED" | sort -V | tail -n 1)" != "$GLIBC_DOCUMENTED" ]; then
             echo "::error::glibc $required is newer than the documented $GLIBC_DOCUMENTED; update docs/HOW-TO-CHANGELOG.md, the release notes and GLIBC_DOCUMENTED"

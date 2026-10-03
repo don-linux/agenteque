@@ -8,8 +8,6 @@
  * are not the finding: a process that opens neither port never finishes launch.
  * Attacker values are passed through `args`, so they sit after Playwright's and
  * win if the binary honors the switch.
- *
- * Cases that honor the switch stay `it.fails` until the secure assertion holds.
  */
 import { createConnection, createServer } from 'node:net'
 import type { ElectronApplication } from 'playwright'
@@ -62,7 +60,7 @@ it('keeps web security on and hostile V8 flags off without attacker switches', a
   }
 })
 
-it.fails(
+it(
   'ADV-E14 packaged app does not open an attacker --remote-debugging-port',
   { meta: ADV_E14 },
   async () => {
@@ -91,32 +89,28 @@ it.fails(
   },
 )
 
-it.fails(
-  'ADV-E14 packaged app does not open an attacker --inspect port',
-  { meta: ADV_E14 },
-  async () => {
-    const port = await reserveLoopbackPort()
-    const launched = await launchPackagedApp({ args: [`--inspect=${port}`] })
-    try {
-      await ready(launched)
-      const debugPort = await launched.app.evaluate(() => process.debugPort)
-      const probe = await probeLoopbackPort(port)
-      expect({
-        honorsAttackerPort: debugPort === port,
-        attackerPortOpen: probe.open,
-        detail: probe.open ? probe.detail : 'closed',
-      }).toEqual({
-        honorsAttackerPort: false,
-        attackerPortOpen: false,
-        detail: 'closed',
-      })
-    } finally {
-      await launched.close()
-    }
-  },
-)
+it('ADV-E14 packaged app does not open an attacker --inspect port', { meta: ADV_E14 }, async () => {
+  const port = await reserveLoopbackPort()
+  const launched = await launchPackagedApp({ args: [`--inspect=${port}`] })
+  try {
+    await ready(launched)
+    const debugPort = await launched.app.evaluate(() => process.debugPort)
+    const probe = await probeLoopbackPort(port)
+    expect({
+      honorsAttackerPort: debugPort === port,
+      attackerPortOpen: probe.open,
+      detail: probe.open ? probe.detail : 'closed',
+    }).toEqual({
+      honorsAttackerPort: false,
+      attackerPortOpen: false,
+      detail: 'closed',
+    })
+  } finally {
+    await launched.close()
+  }
+})
 
-it.fails('ADV-E14 packaged app does not apply hostile --js-flags', { meta: ADV_E14 }, async () => {
+it('ADV-E14 packaged app does not apply hostile --js-flags', { meta: ADV_E14 }, async () => {
   const launched = await launchPackagedApp({
     args: ['--js-flags=--allow-natives-syntax'],
   })
@@ -128,7 +122,7 @@ it.fails('ADV-E14 packaged app does not apply hostile --js-flags', { meta: ADV_E
   }
 })
 
-it.fails(
+it(
   'ADV-E14 packaged app keeps web security with --disable-web-security',
   { meta: ADV_E14 },
   async () => {

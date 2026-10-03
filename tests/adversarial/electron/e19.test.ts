@@ -227,7 +227,7 @@ it(
   },
 )
 
-it.fails(
+it(
   'ADV-E19 packaged binary does not open an attacker --inspect debugger',
   { meta: ADV_E19 },
   async () => {
