@@ -28,6 +28,10 @@ const DENIED_PERMISSIONS = new Set<string>([
   'midiSysex',
 ])
 
+function permissionDenied(permission: string): boolean {
+  return DENIED_PERMISSIONS.has(permission) || clipboardDenied.has(permission)
+}
+
 function externalUrlAllowed(raw: string): boolean {
   if (raw.length > MAX_EXTERNAL_URL_LENGTH) return false
   let parsed: URL
@@ -133,12 +137,10 @@ function isTrustedSender(frame: WebFrameMain | null): boolean {
 
 function installSessionGuards(): void {
   const ses = session.defaultSession
-  const denied = (permission: string): boolean =>
-    DENIED_PERMISSIONS.has(permission) || clipboardDenied.has(permission)
   ses.setPermissionRequestHandler((_contents, permission, callback) => {
-    callback(!denied(permission))
+    callback(!permissionDenied(permission))
   })
-  ses.setPermissionCheckHandler((_contents, permission) => !denied(permission))
+  ses.setPermissionCheckHandler((_contents, permission) => !permissionDenied(permission))
   ses.setDevicePermissionHandler(() => false)
   ses.on('will-download', (event, item) => {
     event.preventDefault()
