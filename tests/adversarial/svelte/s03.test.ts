@@ -12,8 +12,8 @@ const versions: AppVersions = { app: '9.9.9', electron: '1', chrome: '2', node: 
 
 /**
  * Parent that mounts `Child` while `visible` is true.
- * Compiled here so the suite stays one file. `window.api` remains after App unmounts,
- * which is the production shape: the preload bridge outlives the component.
+ * Dropping `visible` unmounts App and leaves `window.api` in place, matching the
+ * preload bridge, which outlives the component.
  */
 const gateSource = `<script>
   let { visible, Child } = $props()
