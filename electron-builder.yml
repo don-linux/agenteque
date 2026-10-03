@@ -1,0 +1,16 @@
+appId: dev.agenteque.app
+productName: agenteque
+directories:
+  output: dist
+  buildResources: build
+files:
+  - out/**/*
+asar: true
+linux:
+  executableName: agenteque
+  target: AppImage
+  category: Development
+mac:
+  target: dmg
+win:
+  target: nsis
