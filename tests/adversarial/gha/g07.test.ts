@@ -1,9 +1,38 @@
-import { existsSync, mkdirSync, symlinkSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs'
+import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { expect, it } from 'vitest'
 import { readWorkflowYaml, runWorkflowStep } from '../helpers/workflow'
 
 const yaml = readWorkflowYaml('release.yml')
+
+/**
+ * `[ -s ]` follows st_size. A directory that contains a file is still 4096
+ * bytes here, so the notes step accepts it and the case stays `it.fails`.
+ * A zero-size directory is already rejected, so that registration runs and
+ * the `it.fails` one is skipped.
+ */
+function notesDirectorySize(): number {
+  const root = mkdtempSync(resolve(tmpdir(), 'agenteque-g07-dir-'))
+  const notes = resolve(root, 'notes')
+  mkdirSync(notes)
+  writeFileSync(resolve(notes, 'nested.md'), 'not the release notes\n')
+  try {
+    return statSync(notes).size
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+}
+
+const notesDirectoryLooksNonEmpty = notesDirectorySize() > 0
 const versionStep = 'Tag matches package.json'
 const notesStep = 'Release notes exist'
 const tag = 'v0.0.1'
@@ -99,7 +128,7 @@ it.fails('ADV-G07 rejects a symlink in place of the release notes file', async (
   }
 })
 
-it.fails('ADV-G07 rejects a directory in place of the release notes file', async () => {
+async function directoryNotesResult(): Promise<{ exitCode: number | null; stdout: string }> {
   const result = await runNotesCheck({
     prepare: (dir) => {
       const notes = resolve(dir, notesRel)
@@ -108,9 +137,26 @@ it.fails('ADV-G07 rejects a directory in place of the release notes file', async
     },
   })
   try {
-    expect(result.exitCode).not.toBe(0)
-    expect(result.stdout).toContain(`::error::Missing ${notesRel}`)
+    return { exitCode: result.exitCode, stdout: result.stdout }
   } finally {
     await result.cleanup()
   }
-})
+}
+
+it.fails.skipIf(!notesDirectoryLooksNonEmpty)(
+  'ADV-G07 rejects a directory in place of the release notes file',
+  async () => {
+    const result = await directoryNotesResult()
+    expect(result.exitCode).not.toBe(0)
+    expect(result.stdout).toContain(`::error::Missing ${notesRel}`)
+  },
+)
+
+it.skipIf(notesDirectoryLooksNonEmpty)(
+  'ADV-G07 rejects a directory in place of the release notes file when the directory size is zero',
+  async () => {
+    const result = await directoryNotesResult()
+    expect(result.exitCode).not.toBe(0)
+    expect(result.stdout).toContain(`::error::Missing ${notesRel}`)
+  },
+)

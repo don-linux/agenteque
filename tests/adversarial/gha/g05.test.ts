@@ -12,11 +12,15 @@ import {
   existsSync,
   lstatSync,
   mkdirSync,
+  mkdtempSync,
   readdirSync,
   readFileSync,
+  rmSync,
+  statSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { expect, it } from 'vitest'
 import { readWorkflowYaml, runWorkflowStep, type WorkflowStepResult } from '../helpers/workflow'
@@ -28,6 +32,25 @@ declare module 'vitest' {
 }
 
 const ADV_G05 = { id: 'ADV-G05' } as const
+
+/**
+ * `[ -s ]` is true for a directory only when st_size > 0. On this filesystem
+ * an empty directory is 4096 bytes, so the step accepts it and the case
+ * stays `it.fails`. A zero-size directory is already rejected, so that
+ * registration runs and the `it.fails` one is skipped.
+ */
+function emptyDirectorySize(): number {
+  const root = mkdtempSync(resolve(tmpdir(), 'agenteque-g05-dir-'))
+  const dir = resolve(root, 'empty')
+  mkdirSync(dir)
+  try {
+    return statSync(dir).size
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+}
+
+const directoryLooksNonEmpty = emptyDirectorySize() > 0
 
 const yaml = readWorkflowYaml('build.yml')
 const STEP = 'Rename and verify artifacts'
@@ -226,7 +249,7 @@ it.fails('ADV-G05 rejects an extra publishable artifact', { meta: ADV_G05 }, asy
   expect(problems, problems.join('\n')).toEqual([])
 })
 
-it.fails('ADV-G05 rejects a directory in place of an artifact', { meta: ADV_G05 }, async () => {
+async function directoryArtifactProblems(): Promise<string[]> {
   const problems: string[] = []
 
   for (const platform of PLATFORMS) {
@@ -243,8 +266,26 @@ it.fails('ADV-G05 rejects a directory in place of an artifact', { meta: ADV_G05 
     await result.cleanup()
   }
 
-  expect(problems, problems.join('\n')).toEqual([])
-})
+  return problems
+}
+
+it.fails.skipIf(!directoryLooksNonEmpty)(
+  'ADV-G05 rejects a directory in place of an artifact',
+  { meta: ADV_G05 },
+  async () => {
+    const problems = await directoryArtifactProblems()
+    expect(problems, problems.join('\n')).toEqual([])
+  },
+)
+
+it.skipIf(directoryLooksNonEmpty)(
+  'ADV-G05 rejects a directory in place of an artifact when the directory size is zero',
+  { meta: ADV_G05 },
+  async () => {
+    const problems = await directoryArtifactProblems()
+    expect(problems, problems.join('\n')).toEqual([])
+  },
+)
 
 it.fails('ADV-G05 rejects a symlink in place of an artifact', { meta: ADV_G05 }, async () => {
   const problems: string[] = []

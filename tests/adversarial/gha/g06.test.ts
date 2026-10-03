@@ -7,7 +7,12 @@
  * pre-release or other suffix, and no extra bytes. Bash `[0-9]` follows
  * LC_COLLATE, and the workflow never pins it, so unicode digits are checked
  * both as on the hosted runner (C.UTF-8) and under a language locale.
+ *
+ * The language locale has to actually apply. This container defaults to
+ * en_US.UTF-8, but a host without that locale leaves bash on the C class.
+ * The unicode `it.fails` would then see a rejection and flip.
  */
+import { spawnSync } from 'node:child_process'
 import { expect, it } from 'vitest'
 import { readWorkflowYaml, runWorkflowStep } from '../helpers/workflow'
 
@@ -28,6 +33,19 @@ const unicodeDigitTags = [
   'v\u0967.\u0968.\u0969',
   'v\u00B9.\u00B2.\u00B3',
 ] as const
+
+/** True when bash `[0-9]` matches `sample` in that locale. Throws if the locale did not load. */
+function digitClassMatches(sample: string, localeName: LocaleName): boolean {
+  const locale = locales[localeName]
+  const result = spawnSync(
+    '/bin/bash',
+    ['--noprofile', '--norc', '-c', '[[ "$1" == [0-9] ]]', 'digit-class', sample],
+    { env: { LANG: locale.LANG, LC_ALL: locale.LC_ALL }, encoding: 'utf8' },
+  )
+  const stderr = result.stderr ?? ''
+  if (stderr.includes('cannot change locale')) throw new Error(stderr.trim())
+  return result.status === 0
+}
 
 async function tagExitCode(tag: string, localeName: LocaleName): Promise<number | null> {
   const locale = locales[localeName]
@@ -79,6 +97,8 @@ it.fails('ADV-G06 rejects a leading zero', async () => {
 })
 
 it('rejects unicode digits in the C locale', async () => {
+  expect(digitClassMatches('\uFF11', 'C.UTF-8')).toBe(false)
+  expect(digitClassMatches('\uFF11', 'en_US.UTF-8')).toBe(true)
   for (const row of await tagExits(unicodeDigitTags, ['C.UTF-8'])) {
     expect(row.exitCode, row.where).toBe(1)
   }

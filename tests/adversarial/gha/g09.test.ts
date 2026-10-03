@@ -1,8 +1,16 @@
+import { spawnSync } from 'node:child_process'
 import { chmodSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { delimiter, resolve } from 'node:path'
 import { expect, it, onTestFinished } from 'vitest'
 import { readWorkflowYaml, runWorkflowStep } from '../helpers/workflow'
+
+/**
+ * The package job runs on ubuntu-24.04, whose default locale is C.UTF-8.
+ * GNU grep `[0-9]` under en_US.UTF-8 also matches fullwidth digits. The
+ * workflow helper inherits this process locale, so the gate is pinned here.
+ */
+const RUNNER_LOCALE = { LANG: 'C.UTF-8', LC_ALL: 'C.UTF-8' } as const
 
 const yaml = readWorkflowYaml('build.yml')
 const step = 'Check the glibc requirement'
@@ -55,7 +63,16 @@ function installObjdump(stdout: string): { binDir: string; logPath: string } {
   return { binDir, logPath }
 }
 
+function assertGnuSort(): void {
+  const version = spawnSync('sort', ['--version'], { encoding: 'utf8' })
+  const text = `${version.stdout ?? ''}\n${version.stderr ?? ''}`
+  if (!text.includes('GNU coreutils')) {
+    throw new Error(`The linux package job uses GNU sort -V. This host reported: ${text.trim()}`)
+  }
+}
+
 async function runGlibcCheck(stdout: string) {
+  assertGnuSort()
   const inherited = process.env.PATH
   if (!inherited) throw new Error('PATH is required so grep, sed, and sort resolve')
   const fake = installObjdump(stdout)
@@ -64,7 +81,7 @@ async function runGlibcCheck(stdout: string) {
     step,
     job: 'package',
     distFiles: { 'linux-unpacked/agenteque': 'not-an-elf' },
-    env: { PATH: `${fake.binDir}${delimiter}${inherited}` },
+    env: { PATH: `${fake.binDir}${delimiter}${inherited}`, ...RUNNER_LOCALE },
   })
   return { result, invocations: readFileSync(fake.logPath, 'utf8') }
 }

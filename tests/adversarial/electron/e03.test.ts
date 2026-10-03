@@ -2,8 +2,15 @@
  * ADV-E03. Assigning `location.href` must not navigate the main window.
  * There is no `will-navigate` handler, so these cases leave the app today
  * and stay `it.fails` until the window remains on its page with `window.api`.
+ *
+ * The file case loads a document this test writes. It does not read
+ * `/etc/passwd`, whose `root:x:0:0` marker is a Linux passwd format.
  */
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
+import { pathToFileURL } from 'node:url'
 import type { ElectronApplication, Page } from 'playwright'
 import { expect, it } from 'vitest'
 import type { AppVersions } from '../../../src/shared/ipc'
@@ -17,8 +24,7 @@ declare module 'vitest' {
 
 const ADV_E03 = { id: 'ADV-E03' } as const
 const SETTLE_MS = 3_000
-const PASSWD_URL = 'file:///etc/passwd'
-const PASSWD_MARKER = 'root:x:0:0'
+const FILE_MARKER = 'ADV-E03-LOCAL-FILE'
 
 interface Observation {
   home: string
@@ -44,16 +50,23 @@ it.fails('ADV-E03 main window does not load a remote origin', { meta: ADV_E03 },
   })
 })
 
-it.fails('ADV-E03 main window does not load file:///etc/passwd', { meta: ADV_E03 }, async () => {
-  const observed = await navigate(PASSWD_URL, PASSWD_MARKER, () => [])
-  expect(observed).toEqual({
-    home: observed.home,
-    url: observed.home,
-    showsApp: true,
-    showsMarker: false,
-    requests: [],
-    apiExposed: true,
-  })
+it.fails('ADV-E03 main window does not load a local file URL', { meta: ADV_E03 }, async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'agenteque-e03-'))
+  const file = join(dir, 'secret.html')
+  writeFileSync(file, `<!doctype html><title>${FILE_MARKER}</title><p>${FILE_MARKER}</p>\n`)
+  try {
+    const observed = await navigate(pathToFileURL(file).href, FILE_MARKER, () => [])
+    expect(observed).toEqual({
+      home: observed.home,
+      url: observed.home,
+      showsApp: true,
+      showsMarker: false,
+      requests: [],
+      apiExposed: true,
+    })
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
 })
 
 async function navigate(
