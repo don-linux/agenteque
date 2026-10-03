@@ -1,0 +1,127 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm fmt:check
+      - run: pnpm check
+      - run: pnpm test
+      - run: pnpm build
+
+  package:
+    needs: checks
+    name: package (${{ matrix.platform }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            platform: linux
+          - os: windows-2022
+            platform: windows
+          - os: macos-14
+            platform: macos
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install Linux packaging tools
+        if: matrix.platform == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y rpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Package
+        run: pnpm dist -- --publish never
+
+      - name: Verify artifacts
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          set -euo pipefail
+          case "$PLATFORM" in
+            linux)
+              files=(
+                "agenteque-0.0.1-amd64.deb"
+                "agenteque-0.0.1-x86_64.rpm"
+                "agenteque-0.0.1-x86_64.AppImage"
+                "agenteque-0.0.1-x64.tar.gz"
+              )
+              ;;
+            windows)
+              files=("agenteque 0.0.1.exe")
+              ;;
+            macos)
+              files=("agenteque-0.0.1-arm64.dmg")
+              ;;
+            *)
+              echo "Unknown platform: $PLATFORM"
+              exit 1
+              ;;
+          esac
+
+          echo "Contents of dist/:"
+          ls -la dist/
+
+          missing=0
+          for f in "${files[@]}"; do
+            if [[ ! -f "dist/$f" ]]; then
+              echo "MISSING: $f"
+              missing=1
+            else
+              echo "OK: $f ($(wc -c < "dist/$f") bytes)"
+            fi
+          done
+          exit "$missing"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: agenteque-${{ matrix.platform }}
+          path: |
+            dist/*.deb
+            dist/*.rpm
+            dist/*.AppImage
+            dist/*.tar.gz
+            dist/*.exe
+            dist/*.dmg
+          if-no-files-found: error
+          retention-days: 7
