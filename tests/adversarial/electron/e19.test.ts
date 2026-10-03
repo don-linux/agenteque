@@ -189,7 +189,7 @@ async function portOpenedDuring(port: number, done: Promise<unknown>): Promise<b
   return opened
 }
 
-it.fails(
+it(
   'ADV-E19 packaged binary does not execute as Node when ELECTRON_RUN_AS_NODE=1',
   { meta: ADV_E19 },
   async () => {
