@@ -8,6 +8,11 @@ export default defineConfig({
   test: {
     projects: [
       {
+        // Los módulos del renderer se importan entre ellos con `$lib`, igual
+        // que en la aplicación.
+        resolve: {
+          alias: [{ find: '$lib', replacement: resolve(root, 'src/renderer/src/lib') }],
+        },
         test: {
           name: 'unit',
           include: ['tests/unit/**/*.test.ts'],

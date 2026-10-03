@@ -5,6 +5,7 @@ import { expect, it } from 'vitest'
 // @ts-expect-error TS7016
 import * as clientRuntime from 'svelte/internal/client'
 import App from '../../../src/renderer/src/App.svelte'
+import BrowserSection from '../../../src/renderer/src/lib/screens/settings/BrowserSection.svelte'
 import type { AppVersions } from '../../../src/shared/ipc'
 import { mountComponent } from '../helpers/svelte'
 
@@ -57,7 +58,7 @@ function deferredVersions(): {
   return { promise, resolve }
 }
 
-it('signals renderer ready on mount while getVersions is still pending', async () => {
+it('signals renderer ready on mount without waiting on any other IPC', async () => {
   const pending = deferredVersions()
   const calls: string[] = []
   const mounted = await mountComponent(App, {
@@ -73,24 +74,34 @@ it('signals renderer ready on mount while getVersions is still pending', async (
   })
 
   try {
-    expect(calls).toEqual(['notifyRendererReady', 'getVersions'])
-    expect(mounted.target.textContent).toContain('Loading')
-    expect(mounted.target.textContent).not.toContain('9.9.9')
+    expect(calls).toEqual(['notifyRendererReady'])
+    expect(mounted.target.textContent).toContain('agenteque')
     await new Promise((resolve) => setTimeout(resolve, 0))
-    expect(calls).toEqual(['notifyRendererReady', 'getVersions'])
-    expect(mounted.target.textContent).toContain('Loading')
-    expect(mounted.target.textContent).not.toContain('9.9.9')
-
-    pending.resolve(versions)
-    await expect.poll(() => mounted.target.textContent).toContain('9.9.9')
-    expect(mounted.target.textContent).not.toContain('Loading')
-    expect(calls.filter((call) => call === 'notifyRendererReady')).toEqual(['notifyRendererReady'])
+    expect(calls).toEqual(['notifyRendererReady'])
   } finally {
     await mounted.unmount()
   }
 })
 
-it('ADV-S03 does not render versions or signal ready again after unmount', async () => {
+it('shows the versions only once the IPC settles', async () => {
+  const pending = deferredVersions()
+  const mounted = await mountComponent(BrowserSection, {
+    api: { getVersions: () => pending.promise },
+  })
+
+  try {
+    expect(mounted.target.textContent).toContain('Cargando…')
+    expect(mounted.target.textContent).not.toContain('9.9.9')
+
+    pending.resolve(versions)
+    await expect.poll(() => mounted.target.textContent).toContain('9.9.9')
+    expect(mounted.target.textContent).not.toContain('Cargando…')
+  } finally {
+    await mounted.unmount()
+  }
+})
+
+it('ADV-S03 does not signal ready again after unmount', async () => {
   const pending = deferredVersions()
   const visible = writable(true)
   let ready = 0
@@ -105,7 +116,7 @@ it('ADV-S03 does not render versions or signal ready again after unmount', async
   })
 
   try {
-    expect(mounted.target.textContent).toContain('Loading')
+    expect(mounted.target.textContent).toContain('agenteque')
     expect(ready).toBe(1)
 
     visible.set(false)
@@ -116,8 +127,31 @@ it('ADV-S03 does not render versions or signal ready again after unmount', async
     pending.resolve(versions)
     await new Promise((resolve) => setTimeout(resolve, 0))
     mounted.flush()
-    expect(mounted.target.textContent).not.toContain('9.9.9')
     expect(ready).toBe(1)
+  } finally {
+    await mounted.unmount()
+  }
+})
+
+it('ADV-S03 does not render versions after the panel unmounts', async () => {
+  const pending = deferredVersions()
+  const visible = writable(true)
+  const mounted = await mountComponent(Gate, {
+    props: { visible, Child: BrowserSection },
+    api: { getVersions: () => pending.promise },
+  })
+
+  try {
+    expect(mounted.target.textContent).toContain('Cargando…')
+
+    visible.set(false)
+    mounted.flush()
+    expect(mounted.target.textContent).not.toContain('Cargando…')
+
+    pending.resolve(versions)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    mounted.flush()
+    expect(mounted.target.textContent).not.toContain('9.9.9')
   } finally {
     await mounted.unmount()
   }

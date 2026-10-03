@@ -112,7 +112,7 @@ it(
 it('ADV-E16 a second ready signal must not report OK', { meta: ADV_E16 }, async () => {
   const launched = await launchSmoke()
   const page = await launched.app.firstWindow({ timeout: 15_000 })
-  await page.locator('.versions code').first().waitFor({ timeout: 10_000 })
+  await page.locator('h1').first().waitFor({ timeout: 10_000 })
   expect(launched.app.process().exitCode, 'smoke exited before the second signal').toBeNull()
 
   await launched.app.evaluate(({ ipcMain }, channel: string) => {

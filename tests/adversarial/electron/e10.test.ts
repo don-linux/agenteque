@@ -7,7 +7,21 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, it } from 'vitest'
-import { launchApp, type LaunchedElectronApp } from '../helpers/electron'
+import { launchApp, type LaunchedElectronApp, openVersionsPanel } from '../helpers/electron'
+
+/** Todo lo que el preload expone; nada más puede cruzar el contextBridge. */
+const BRIDGE_KEYS = [
+  'platform',
+  'getVersions',
+  'notifyRendererReady',
+  'loadConfig',
+  'saveTerminalSettings',
+  'saveAppearanceSettings',
+  'saveLayoutSettings',
+  'saveWorkspaceView',
+  'recordRecentFolder',
+  'removeRecentFolder',
+] as readonly string[]
 
 const SENTINEL = 'ADV-E10-SENTINEL'
 const FLOOD_COUNT = 10_000
@@ -182,8 +196,7 @@ async function stop(launched: LaunchedElectronApp): Promise<void> {
 async function launchReady(): Promise<ReadyApp> {
   const launched = await launchApp()
   if (!launched.window) throw new Error('app did not open a window')
-  await launched.window.locator('h1').waitFor()
-  await launched.window.locator('.versions li').first().waitFor()
+  await openVersionsPanel(launched.window)
   return launched as ReadyApp
 }
 
@@ -198,8 +211,9 @@ function expectVersions(actual: unknown, expected: Versions): void {
   expect(encoded).not.toContain('advE10polluted')
 }
 
+/** `launchReady` leaves the app on the settings screen that reads the versions. */
 async function expectUi(launched: ReadyApp): Promise<void> {
-  expect(await launched.window.locator('h1').textContent()).toBe('agenteque')
+  expect(await launched.window.locator('h1').textContent()).toBe('Configuración')
   expectAlive(launched)
 }
 
@@ -413,7 +427,9 @@ it('ADV-E10 unknown channels fail', async () => {
     expect(surface.missing, 'window.api missing').toBe(false)
     if (surface.missing) return
     expect(surface.globals).toEqual([])
-    expect(surface.keys.toSorted()).toEqual(['getVersions', 'notifyRendererReady'])
+    expect(surface.keys).toContain('getVersions')
+    expect(surface.keys).toContain('notifyRendererReady')
+    expect(surface.keys.filter((key) => !BRIDGE_KEYS.includes(key))).toEqual([])
     expectVersions(surface.channelArg, versions)
     expect(surface.polluted).toBe(false)
 

@@ -1,13 +1,24 @@
 /**
- * E07: window.api is exactly getVersions and notifyRendererReady, those methods
- * are not usefully overwriteable, and prototype pollution does not cross contextBridge.
+ * E07: window.api is exactly the bridge the preload declares, those methods are
+ * not usefully overwriteable, and prototype pollution does not cross contextBridge.
  */
 import type { ElectronApplication, Page } from 'playwright'
 import { expect, it } from 'vitest'
 import { IpcChannel } from '../../../src/shared/ipc'
-import { launchApp } from '../helpers/electron'
+import { launchApp, openVersionsPanel } from '../helpers/electron'
 
-const API_KEYS = ['getVersions', 'notifyRendererReady'] as const
+const API_KEYS = [
+  'getVersions',
+  'loadConfig',
+  'notifyRendererReady',
+  'platform',
+  'recordRecentFolder',
+  'removeRecentFolder',
+  'saveAppearanceSettings',
+  'saveLayoutSettings',
+  'saveTerminalSettings',
+  'saveWorkspaceView',
+] as const
 const VERSION_KEYS = ['app', 'chrome', 'electron', 'node'] as const
 const MARKER = 'advE07Polluted'
 
@@ -19,7 +30,7 @@ async function openApp(): Promise<{ app: ElectronApplication; page: Page }> {
   const launched = await launchApp()
   const page = launched.window
   if (!page) throw new Error('app did not open a window')
-  await page.locator('.versions li').first().waitFor()
+  await openVersionsPanel(page)
   return { app: launched.app, page }
 }
 

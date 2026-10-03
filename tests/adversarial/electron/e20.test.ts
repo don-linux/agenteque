@@ -29,8 +29,9 @@ declare module 'vitest' {
 
 const ADV_E20 = { id: 'ADV-E20' } as const
 
-const TAGLINE = 'Electron + Svelte 5 + Vite 8'
-const TAMPERED_TAGLINE = 'E20 TAMPERED ASAR PAYLOAD!!!'
+const TAGLINE = 'Abre una carpeta para ver y editar sus archivos markdown.'
+// `replaceAsarPayload` edita bytes en sitio, así que el relleno iguala el largo.
+const TAMPERED_TAGLINE = 'E20 TAMPERED ASAR PAYLOAD'.padEnd(TAGLINE.length, '!')
 const HOSTILE_MARKER = 'E20-HOSTILE-APP-DIR'
 const HOSTILE_VERSION = '9.9.9'
 const REAL_VERSION = '0.0.1'

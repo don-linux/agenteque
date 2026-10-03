@@ -1,9 +1,11 @@
 import { expect, it } from 'vitest'
-import App from '../../../src/renderer/src/App.svelte'
+import BrowserSection from '../../../src/renderer/src/lib/screens/settings/BrowserSection.svelte'
 import { mountComponent, type MountedComponent } from '../helpers/svelte'
 
 const DANGEROUS =
   'img, script, iframe, object, embed, svg, a, form, video, source, link, meta, base'
+
+const UNAVAILABLE = 'No se pudieron leer las versiones'
 
 /**
  * Markup that becomes an element only if the versions view parses HTML.
@@ -23,41 +25,36 @@ function markup(label: string): string {
   ].join('')
 }
 
-interface SettledVersions {
+interface Settled {
   mounted: MountedComponent
-  readyCount: number
   renderError: unknown
 }
 
 /**
- * `notifyRendererReady` runs on mount, before versions exist. Counting that
- * call must not flush: the payload is not assigned yet. After it resolves,
- * flush here so a render throw stays on this stack.
+ * The settings section reads `app:versions` on mount. Resolve the payload after
+ * mounting and flush here, so a render throw stays on this stack.
  */
-async function settleVersions(payload: unknown): Promise<SettledVersions> {
-  let readyCount = 0
+async function settleVersions(payload: unknown): Promise<Settled> {
   let renderError: unknown
   let resolveVersions!: (value: unknown) => void
-  const mounted = await mountComponent(App, {
+  const mounted = await mountComponent(BrowserSection, {
     api: {
       getVersions: () =>
         new Promise((resolve) => {
           resolveVersions = resolve
         }),
-      notifyRendererReady: () => {
-        readyCount += 1
-      },
     },
   })
 
   resolveVersions(payload)
+  await Promise.resolve()
   await Promise.resolve()
   try {
     mounted.flush()
   } catch (error) {
     renderError = error
   }
-  return { mounted, readyCount, renderError }
+  return { mounted, renderError }
 }
 
 function assertNoActiveMarkup(mounted: MountedComponent, raw: string): void {
@@ -74,15 +71,8 @@ function assertNoActiveMarkup(mounted: MountedComponent, raw: string): void {
   expect(html.includes('&lt;img')).toBe(true)
 }
 
-function assertShell(mounted: MountedComponent): void {
-  const document = mounted.window.document
-  expect(document.querySelector('h1')?.textContent).toBe('agenteque')
-  const button = document.querySelector('button')
-  if (!button) throw new Error('counter button missing')
-  expect(button.textContent).toBe('count is 0')
-  button.click()
-  mounted.flush()
-  expect(button.textContent).toBe('count is 1')
+function assertSection(mounted: MountedComponent): void {
+  expect(mounted.window.document.querySelector('h2')?.textContent).toBe('Navegador')
 }
 
 it('ADV-S02 renders HTML version strings as text', async () => {
@@ -90,15 +80,14 @@ it('ADV-S02 renders HTML version strings as text', async () => {
   const electron = markup('electron')
   const chrome = markup('chrome')
   const node = markup('node')
-  const { mounted, readyCount, renderError } = await settleVersions({ app, electron, chrome, node })
+  const { mounted, renderError } = await settleVersions({ app, electron, chrome, node })
 
   expect(renderError).toBeUndefined()
-  expect(readyCount).toBe(1)
   assertNoActiveMarkup(mounted, app)
   assertNoActiveMarkup(mounted, electron)
   assertNoActiveMarkup(mounted, chrome)
   assertNoActiveMarkup(mounted, node)
-  assertShell(mounted)
+  assertSection(mounted)
   await mounted.unmount()
 })
 
@@ -106,7 +95,7 @@ it('ADV-S02 renders a huge version string as text', async () => {
   const marker = 'ADV-S02-HUGE-END'
   const embedded = markup('huge')
   const huge = `${embedded}${'A'.repeat(1_048_576)}${marker}`
-  const { mounted, readyCount, renderError } = await settleVersions({
+  const { mounted, renderError } = await settleVersions({
     app: huge,
     electron: '1',
     chrome: '2',
@@ -114,7 +103,6 @@ it('ADV-S02 renders a huge version string as text', async () => {
   })
 
   expect(renderError).toBeUndefined()
-  expect(readyCount).toBe(1)
   const text = mounted.window.document.body.textContent ?? ''
   expect(text.includes(marker)).toBe(true)
   expect(text.includes(embedded)).toBe(true)
@@ -123,21 +111,16 @@ it('ADV-S02 renders a huge version string as text', async () => {
   const html = mounted.window.document.body.innerHTML
   expect(html.includes('<img')).toBe(false)
   expect(html.includes('&lt;img')).toBe(true)
-  assertShell(mounted)
+  assertSection(mounted)
   await mounted.unmount()
 })
 
-it('ADV-S02 renders hostile getters and toString as text', async () => {
+it('ADV-S02 renders a hostile string reached through a getter as text', async () => {
   const fromGetter = markup('getter')
-  const fromToString = markup('toString')
-  const fromPrimitive = markup('primitive')
   const fromInherited = markup('inherited')
-  const fromArray = markup('array')
   const fromClass = markup('class')
   const fromNullProto = markup('nullproto')
-  const fromNested = markup('nested')
   let getterReads = 0
-  let toStringReads = 0
 
   const inherited = Object.create({
     get app(): string {
@@ -149,10 +132,7 @@ it('ADV-S02 renders hostile getters and toString as text', async () => {
   inherited.node = '3'
 
   const nullProto = Object.create(null) as Record<string, unknown>
-  Object.defineProperty(nullProto, 'app', {
-    enumerable: true,
-    get: () => fromNullProto,
-  })
+  Object.defineProperty(nullProto, 'app', { enumerable: true, get: () => fromNullProto })
   nullProto.electron = '1'
   nullProto.chrome = '2'
   nullProto.node = '3'
@@ -185,69 +165,27 @@ it('ADV-S02 renders hostile getters and toString as text', async () => {
         },
       },
     },
-    {
-      text: fromToString,
-      payload: {
-        app: {
-          toString(): string {
-            toStringReads += 1
-            return fromToString
-          },
-        },
-        electron: '1',
-        chrome: '2',
-        node: '3',
-      },
-    },
-    {
-      text: fromPrimitive,
-      payload: {
-        app: {
-          [Symbol.toPrimitive](): string {
-            return fromPrimitive
-          },
-        },
-        electron: '1',
-        chrome: '2',
-        node: '3',
-      },
-    },
     { text: fromInherited, payload: inherited },
-    { text: fromArray, payload: { app: [fromArray], electron: '1', chrome: '2', node: '3' } },
     { text: fromClass, payload: new HostileVersions() },
     { text: fromNullProto, payload: nullProto },
-    {
-      text: fromNested,
-      payload: {
-        get app(): { toString(): string } {
-          return {
-            toString(): string {
-              return fromNested
-            },
-          }
-        },
-        electron: '1',
-        chrome: '2',
-        node: '3',
-      },
-    },
   ]
 
   for (const { payload, text } of cases) {
-    const { mounted, readyCount, renderError } = await settleVersions(payload)
+    const { mounted, renderError } = await settleVersions(payload)
     expect(renderError).toBeUndefined()
-    expect(readyCount).toBe(1)
     assertNoActiveMarkup(mounted, text)
-    assertShell(mounted)
+    assertSection(mounted)
     await mounted.unmount()
   }
 
   expect(getterReads).toBeGreaterThan(0)
-  expect(toStringReads).toBeGreaterThan(0)
 })
 
-// Throwing getters and toString are caught by versionText and render as empty text.
-it('ADV-S02 renders throwing version fields as empty text', async () => {
+/**
+ * Anything that is not a plain string is refused before it reaches the
+ * template: half a row of garbage reads worse than saying there is no data.
+ */
+it('ADV-S02 refuses payloads that are not plain strings', async () => {
   const throwingGetter = {
     get app(): string {
       throw new Error('hostile getter')
@@ -256,10 +194,10 @@ it('ADV-S02 renders throwing version fields as empty text', async () => {
     chrome: '2',
     node: '3',
   }
-  const throwingToString = {
+  const hostileToString = {
     app: {
       toString(): string {
-        throw new Error('hostile toString')
+        return markup('toString')
       },
     },
     electron: '1',
@@ -289,18 +227,7 @@ it('ADV-S02 renders throwing version fields as empty text', async () => {
     chrome: '2',
     node: '3',
   }
-  const throwingNested = {
-    get app(): { toString(): string } {
-      return {
-        toString(): string {
-          throw new Error('hostile nested toString')
-        },
-      }
-    },
-    electron: '1',
-    chrome: '2',
-    node: '3',
-  }
+  const hostileArray = { app: [markup('array')], electron: '1', chrome: '2', node: '3' }
   const nullProto = Object.create(null) as Record<string, unknown>
   Object.defineProperty(nullProto, 'app', {
     enumerable: true,
@@ -314,17 +241,22 @@ it('ADV-S02 renders throwing version fields as empty text', async () => {
 
   for (const payload of [
     throwingGetter,
-    throwingToString,
+    hostileToString,
     nonPrimitive,
     throwingPrimitive,
-    throwingNested,
+    hostileArray,
     nullProto,
+    null,
+    'nope',
+    42,
+    [],
   ]) {
-    const { mounted, readyCount, renderError } = await settleVersions(payload)
+    const { mounted, renderError } = await settleVersions(payload)
     expect(renderError, 'versions render threw').toBeUndefined()
-    expect(readyCount).toBe(1)
     expect(mounted.window.document.querySelector(DANGEROUS)).toBeNull()
-    assertShell(mounted)
+    expect(mounted.window.document.body.textContent).toContain(UNAVAILABLE)
+    expect(mounted.window.document.querySelector('ul')).toBeNull()
+    assertSection(mounted)
     await mounted.unmount()
   }
 })

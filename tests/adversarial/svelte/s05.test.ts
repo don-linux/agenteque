@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import Counter from '../../../src/renderer/src/lib/Counter.svelte'
+import Counter from '../helpers/Counter.svelte'
 import { mountComponent, type MountedComponent } from '../helpers/svelte'
 
 const CLICKS = 100_000

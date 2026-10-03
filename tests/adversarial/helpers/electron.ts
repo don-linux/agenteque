@@ -2,6 +2,7 @@
  * Public exports:
  * - launchApp
  * - launchPackagedApp
+ * - openVersionsPanel
  * - packagedExecutable
  * - startHostileServer
  *
@@ -118,6 +119,18 @@ export async function launchPackagedApp(
     throw new Error(`${executable} is missing. The adversarial globalSetup packs it.`)
   }
   return launchElectron(executable, [], options)
+}
+
+/**
+ * Navigate to the Navegador settings section and wait for the runtime rows.
+ * That screen is the only place the renderer calls `app:versions`.
+ */
+export async function openVersionsPanel(page: Page): Promise<void> {
+  await page.locator('h1').waitFor()
+  await page.evaluate((hash: string) => {
+    ;(globalThis as unknown as { location: { hash: string } }).location.hash = hash
+  }, '#/configuracion/navegador')
+  await page.locator('ul[aria-label="Versiones del runtime"] li').first().waitFor()
 }
 
 /**
