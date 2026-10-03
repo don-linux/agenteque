@@ -109,8 +109,16 @@ async function runRename(platform: Platform, label: string): Promise<WorkflowSte
   })
 }
 
+/** `$LABEL` / `${LABEL}` only inside double quotes, so the value is not split or globbed. */
+function assertLabelExpansionsAreQuoted(script: string): void {
+  const withoutDoubleQuotes = script.replace(/"(?:[^"\\]|\\.)*"/g, '""')
+  expect(withoutDoubleQuotes.includes('$LABEL')).toBe(false)
+  expect(withoutDoubleQuotes.includes('${LABEL}')).toBe(false)
+}
+
 function assertNoCommandSideEffects(result: WorkflowStepResult, where: string): void {
   expect(result.script, where).toContain('agenteque-$LABEL-')
+  assertLabelExpansionsAreQuoted(result.script)
   for (const path of relativeFiles(result.dir)) {
     expect(path.split(sep), where).not.toContain('pwned')
   }
@@ -141,6 +149,7 @@ it('does not inline inputs.label into the rename script', () => {
   expect(script.includes('${{')).toBe(false)
   expect(script).toContain('mv "dist/${built[$i]}" "dist/${renamed[$i]}"')
   expect(yaml).toContain('LABEL: ${{ inputs.label }}')
+  assertLabelExpansionsAreQuoted(script)
 })
 
 it('treats $(touch pwned) in LABEL as a literal filename', async () => {
