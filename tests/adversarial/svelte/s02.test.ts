@@ -246,8 +246,8 @@ it('ADV-S02 renders hostile getters and toString as text', async () => {
   expect(toStringReads).toBeGreaterThan(0)
 })
 
-// Throwing getters and toString escape the text interpolation as an uncaught render error.
-it.fails('ADV-S02', async () => {
+// Throwing getters and toString are caught by versionText and render as empty text.
+it('ADV-S02 renders throwing version fields as empty text', async () => {
   const throwingGetter = {
     get app(): string {
       throw new Error('hostile getter')

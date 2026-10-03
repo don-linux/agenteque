@@ -5,6 +5,20 @@
 
   let versions = $state<AppVersions | null>(null)
 
+  function versionText(source: object, key: keyof AppVersions): string {
+    try {
+      const value = (source as Record<string, unknown>)[key]
+      if (typeof value === 'string') return value
+      if (value == null) return ''
+      if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
+        return String(value)
+      }
+      return String(value)
+    } catch {
+      return ''
+    }
+  }
+
   onMount(() => {
     window.api.notifyRendererReady()
     void Promise.resolve(window.api.getVersions()).then(
@@ -30,10 +44,10 @@
     <h2>Versions (via IPC)</h2>
     {#if versions}
       <ul>
-        <li>app <code>{versions.app}</code></li>
-        <li>Electron <code>{versions.electron}</code></li>
-        <li>Chromium <code>{versions.chrome}</code></li>
-        <li>Node <code>{versions.node}</code></li>
+        <li>app <code>{versionText(versions, 'app')}</code></li>
+        <li>Electron <code>{versionText(versions, 'electron')}</code></li>
+        <li>Chromium <code>{versionText(versions, 'chrome')}</code></li>
+        <li>Node <code>{versionText(versions, 'node')}</code></li>
       </ul>
     {:else}
       <p>Loading…</p>
