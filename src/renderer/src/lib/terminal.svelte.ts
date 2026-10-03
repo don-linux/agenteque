@@ -13,14 +13,16 @@ import {
 } from '$lib/panel-resize'
 import { MAX_TERMINAL_SESSIONS, workspacePtyId } from '$lib/pty'
 import { nextDockToggle, type TerminalDock } from '$lib/terminal-dock'
+import { phaseAfterWidgetGone, shouldSpawnTerminal, type TerminalPhase } from '$lib/terminal-phase'
 import { surface, type WorkspaceSurface } from '$lib/workspace-surface.svelte'
 
-export type { TerminalDock, WorkspaceSurface }
+export type { TerminalDock, TerminalPhase, WorkspaceSurface }
 export { MAX_TERMINAL_SESSIONS }
 
 export interface TerminalSession {
   id: string
-  alive: boolean
+  /** `idle` no ha arrancado, `running` tiene proceso, `exited` murió y no se relanza. */
+  phase: TerminalPhase
   error: string | null
 }
 
@@ -53,6 +55,9 @@ class TerminalPanelState {
   #nextSerial = 1
   #spawning = new Set<string>()
   #writers = new Map<string, (chunk: string) => void>()
+  #mounted = new Set<string>()
+  /** Sube al desmontar el widget para que un `spawn` o un `onExit` viejos no pisen el estado. */
+  #epoch = new Map<string, number>()
 
   get size(): number {
     return this.dock === 'bottom' ? this.bottomSize : this.rightSize
@@ -166,7 +171,7 @@ class TerminalPanelState {
 
     const id = workspacePtyId(this.#nextSerial)
     this.#nextSerial += 1
-    this.sessions = [...this.sessions, { id, alive: false, error: null }]
+    this.sessions = [...this.sessions, { id, phase: 'idle', error: null }]
     this.activeId = id
     this.started = true
     return id
@@ -187,6 +192,30 @@ class TerminalPanelState {
     this.open = false
   }
 
+  attachWidget(id: string): void {
+    this.#mounted.add(id)
+  }
+
+  /**
+   * El xterm ya no existe. Si la sesión seguía viva, el proceso se mata y el
+   * siguiente montaje arranca otro. Un `exit` no vuelve a `idle`: el panel
+   * nuevo solo pinta que la sesión terminó.
+   */
+  detachWidget(id: string): void {
+    this.#mounted.delete(id)
+    this.#writers.delete(id)
+
+    const session = this.session(id)
+    if (!session || phaseAfterWidgetGone(session.phase) === 'exited') return
+
+    this.#epoch.set(id, (this.#epoch.get(id) ?? 0) + 1)
+    this.#spawning.delete(id)
+    this.#patch(id, { phase: 'idle', error: null })
+    void this.#backend.kill(id).catch(() => {
+      // La sesión puede haberse ido ya.
+    })
+  }
+
   attachWriter(id: string, write: (chunk: string) => void): void {
     this.#writers.set(id, write)
   }
@@ -197,8 +226,10 @@ class TerminalPanelState {
 
   async spawn(id: string, cwd: string, cols: number, rows: number): Promise<void> {
     const session = this.session(id)
-    if (!session || session.alive || this.#spawning.has(id)) return
+    if (!session || !this.#mounted.has(id) || this.#spawning.has(id)) return
+    if (!shouldSpawnTerminal(session.phase, session.error)) return
 
+    const epoch = this.#epoch.get(id) ?? 0
     this.#spawning.add(id)
     this.#patch(id, { error: null })
 
@@ -208,19 +239,39 @@ class TerminalPanelState {
         cwd,
         cols,
         rows,
-        onData: (chunk) => this.#writers.get(id)?.(chunk),
-        onExit: () => this.#patch(id, { alive: false }),
+        onData: (chunk) => {
+          if ((this.#epoch.get(id) ?? 0) !== epoch) return
+          this.#writers.get(id)?.(chunk)
+        },
+        onExit: () => {
+          if ((this.#epoch.get(id) ?? 0) !== epoch) return
+          const current = this.session(id)
+          if (!current || current.phase === 'exited') return
+          this.#patch(id, { phase: 'exited' })
+        },
       })
-      this.#patch(id, { alive: true })
+
+      if ((this.#epoch.get(id) ?? 0) !== epoch || !this.session(id)) {
+        try {
+          await this.#backend.kill(id)
+        } catch {
+          // La sesión puede haberse ido ya.
+        }
+        return
+      }
+
+      if (this.session(id)?.phase === 'exited') return
+      this.#patch(id, { phase: 'running' })
     } catch (error) {
-      this.#patch(id, { alive: false, error: messageFrom(error) })
+      if ((this.#epoch.get(id) ?? 0) !== epoch) return
+      this.#patch(id, { phase: 'idle', error: messageFrom(error) })
     } finally {
       this.#spawning.delete(id)
     }
   }
 
   async write(id: string, data: string): Promise<void> {
-    if (!this.session(id)?.alive) return
+    if (this.session(id)?.phase !== 'running') return
 
     try {
       await this.#backend.write(id, data)
@@ -230,7 +281,7 @@ class TerminalPanelState {
   }
 
   async resize(id: string, cols: number, rows: number): Promise<void> {
-    if (!this.session(id)?.alive) return
+    if (this.session(id)?.phase !== 'running') return
 
     try {
       await this.#backend.resize(id, cols, rows)
@@ -250,6 +301,8 @@ class TerminalPanelState {
 
     this.#spawning.delete(id)
     this.#writers.delete(id)
+    this.#mounted.delete(id)
+    this.#epoch.delete(id)
     this.sessions = this.sessions.filter((session) => session.id !== id)
     this.activeId = next
 
@@ -278,6 +331,8 @@ class TerminalPanelState {
     this.#nextSerial = 1
     this.#spawning.clear()
     this.#writers.clear()
+    this.#mounted.clear()
+    this.#epoch.clear()
 
     try {
       await this.#backend.killAll()

@@ -8,6 +8,7 @@
   import { isTerminalDockShortcut, isTerminalSurfaceShortcut } from '$lib/terminal-dock'
   import { terminal } from '$lib/terminal.svelte'
   import { xtermFontFamily } from '$lib/terminal-font'
+  import { shouldSpawnTerminal, TERMINAL_SESSION_ENDED } from '$lib/terminal-phase'
   import { TERMINAL_XTERM_OPTIONS, resolveTerminalTheme } from '$lib/terminal-theme'
   import '@xterm/xterm/css/xterm.css'
 
@@ -32,6 +33,7 @@
   let view: Terminal | undefined
   let fit: FitAddon | undefined
   let lastAppliedThemeId: string | undefined
+  let disposed = false
   let session = $derived(terminal.session(sessionId))
 
   function fitAndResize(): void {
@@ -54,6 +56,7 @@
   onMount(() => {
     if (!host) return
 
+    terminal.attachWidget(sessionId)
     const xterm = new Terminal({
       ...TERMINAL_XTERM_OPTIONS,
       fontFamily: xtermFontFamily(appConfig.terminalFontFamily),
@@ -74,6 +77,9 @@
     view = xterm
     fit = fitAddon
     terminal.attachWriter(sessionId, (chunk) => xterm.write(chunk))
+    if (terminal.session(sessionId)?.phase === 'exited') {
+      xterm.write(TERMINAL_SESSION_ENDED)
+    }
 
     const input = xterm.onData((data) => {
       void terminal.write(sessionId, data)
@@ -87,6 +93,7 @@
     ready = true
 
     return () => {
+      disposed = true
       view = undefined
       fit = undefined
       lastAppliedThemeId = undefined
@@ -94,6 +101,7 @@
       observer.disconnect()
       input.dispose()
       terminal.detachWriter(sessionId)
+      terminal.detachWidget(sessionId)
       xterm.dispose()
     }
   })
@@ -103,9 +111,10 @@
 
     const root = cwd
     const id = sessionId
-    const shouldSpawn = !session.alive && session.error === null
+    const shouldSpawn = shouldSpawnTerminal(session.phase, session.error)
 
     const frame = requestAnimationFrame(() => {
+      if (disposed) return
       if (visible) fitAndResize()
 
       if (!shouldSpawn || !view) return
