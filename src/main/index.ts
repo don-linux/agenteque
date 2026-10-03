@@ -1,6 +1,6 @@
 import { join, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { app, BrowserWindow, ipcMain, shell, type WebFrameMain } from 'electron'
+import { app, BrowserWindow, ipcMain, session, shell, type WebFrameMain } from 'electron'
 import { type AppVersions, IpcChannel } from '../shared/ipc'
 
 const isSmokeTest = process.argv.includes('--smoke-test')
@@ -46,6 +46,32 @@ function installNavigationGuard(contents: Electron.WebContents): void {
   contents.on('will-frame-navigate', (event) => {
     if (event.isMainFrame) confine(event)
   })
+}
+
+/**
+ * Camera and microphone share `media`. MIDI sysex is a separate check from
+ * `midi`. Approximate geolocation is the same capability as geolocation.
+ */
+const DENIED_PERMISSIONS = new Set<string>([
+  'media',
+  'geolocation',
+  'geolocation-approximate',
+  'notifications',
+  'midi',
+  'midiSysex',
+])
+
+function denyDevicePermissions(): void {
+  const ses = session.defaultSession
+  ses.setPermissionRequestHandler((_contents, permission, callback) => {
+    callback(!DENIED_PERMISSIONS.has(permission))
+  })
+  ses.setPermissionCheckHandler((_contents, permission) => {
+    // Electron's default check allows every permission except this one.
+    if (permission === 'deprecated-sync-clipboard-read') return false
+    return !DENIED_PERMISSIONS.has(permission)
+  })
+  ses.setDevicePermissionHandler(() => false)
 }
 
 function createWindow(): BrowserWindow {
@@ -181,6 +207,7 @@ function armSmokeTest(win: BrowserWindow): void {
 }
 
 void app.whenReady().then(() => {
+  denyDevicePermissions()
   registerIpcHandlers()
   const win = createWindow()
   if (isSmokeTest) armSmokeTest(win)

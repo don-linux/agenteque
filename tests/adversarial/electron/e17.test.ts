@@ -106,29 +106,27 @@ function appPage(): Page {
   return page
 }
 
-// No permission handler is installed, so Electron grants these. it.fails keeps
-// the suite green until denial lands; the assertion stays the secure one.
-it.fails('ADV-E17 camera permission is not granted', async () => {
+it('ADV-E17 camera permission is not granted', async () => {
   const outcome = await requestPermission(appPage(), 'camera')
   expect(outcome.granted, outcome.detail).toBe(false)
 })
 
-it.fails('ADV-E17 microphone permission is not granted', async () => {
+it('ADV-E17 microphone permission is not granted', async () => {
   const outcome = await requestPermission(appPage(), 'microphone')
   expect(outcome.granted, outcome.detail).toBe(false)
 })
 
-it.fails('ADV-E17 geolocation permission is not granted', async () => {
+it('ADV-E17 geolocation permission is not granted', async () => {
   const outcome = await requestPermission(appPage(), 'geolocation')
   expect(outcome.granted, outcome.detail).toBe(false)
 })
 
-it.fails('ADV-E17 notifications permission is not granted', async () => {
+it('ADV-E17 notifications permission is not granted', async () => {
   const outcome = await requestPermission(appPage(), 'notifications')
   expect(outcome.granted, outcome.detail).toBe(false)
 })
 
-it.fails('ADV-E17 MIDI permission is not granted', async () => {
+it('ADV-E17 MIDI permission is not granted', async () => {
   const outcome = await requestPermission(appPage(), 'midi')
   expect(outcome.granted, outcome.detail).toBe(false)
 })
