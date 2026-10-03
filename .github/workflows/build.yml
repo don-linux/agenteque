@@ -86,7 +86,12 @@ jobs:
           GLIBC_DOCUMENTED: '2.25'
         run: |
           set -euo pipefail
-          required="$(objdump -T dist/linux-unpacked/agenteque | grep -o 'GLIBC_[0-9.]*' | sed 's/GLIBC_//' | sort -uV | tail -n 1)"
+          # The shipped entry point is a shell filter. The Electron ELF is the sibling .bin.
+          binary=dist/linux-unpacked/agenteque
+          if [ -f dist/linux-unpacked/agenteque.bin ]; then
+            binary=dist/linux-unpacked/agenteque.bin
+          fi
+          required="$(objdump -T "$binary" | grep -o 'GLIBC_[0-9.]*' | sed 's/GLIBC_//' | sort -uV | tail -n 1)"
           echo "The packaged binary needs glibc $required (documented: $GLIBC_DOCUMENTED)"
           if [ "$(printf '%s\n%s\n' "$required" "$GLIBC_DOCUMENTED" | sort -V | tail -n 1)" != "$GLIBC_DOCUMENTED" ]; then
             echo "::error::glibc $required is newer than the documented $GLIBC_DOCUMENTED; update docs/HOW-TO-CHANGELOG.md, the release notes and GLIBC_DOCUMENTED"
@@ -135,13 +140,38 @@ jobs:
 
           missing=0
           for i in "${!built[@]}"; do
-            if [[ ! -s "dist/${built[$i]}" ]]; then
+            src="dist/${built[$i]}"
+            dest="dist/${renamed[$i]}"
+            if [[ -L "$src" || ! -f "$src" || ! -s "$src" ]]; then
               echo "MISSING: ${built[$i]}"
               missing=1
               continue
             fi
             mv "dist/${built[$i]}" "dist/${renamed[$i]}"
-            echo "OK: ${renamed[$i]} ($(wc -c < "dist/${renamed[$i]}") bytes)"
+            if ! bytes="$(wc -c < "$dest" | tr -d '[:space:]')"; then
+              echo "UNREADABLE: ${renamed[$i]}"
+              missing=1
+              continue
+            fi
+            echo "OK: ${renamed[$i]} (${bytes} bytes)"
+          done
+
+          prefix="agenteque-${LABEL}-"
+          shopt -s nullglob
+          for path in dist/*; do
+            base="${path#dist/}"
+            [[ "$base" == "$prefix"* ]] || continue
+            known=0
+            for name in "${renamed[@]}"; do
+              if [[ "$base" == "$name" ]]; then
+                known=1
+                break
+              fi
+            done
+            if [[ "$known" -ne 1 || -L "$path" || ! -f "$path" || ! -s "$path" ]]; then
+              echo "UNEXPECTED: $base"
+              missing=1
+            fi
           done
           exit "$missing"
 

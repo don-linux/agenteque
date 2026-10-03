@@ -37,6 +37,11 @@ jobs:
       - run: pnpm fmt:check
       - run: pnpm check
       - run: pnpm test
+      - run: xvfb-run -a pnpm test:adversarial
+        env:
+          # persist-credentials is false, so gh does not see the checkout token.
+          # contents: read is enough for the public pin lookup in g01.
+          GH_TOKEN: ${{ github.token }}
       - run: pnpm build
 
   build:
