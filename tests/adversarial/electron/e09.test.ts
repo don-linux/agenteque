@@ -162,9 +162,8 @@ it('a foreign iframe must not receive app:versions', async () => {
   expect(isVersionPayload(parent.versions), JSON.stringify(parent)).toBe(false)
 })
 
-// The versions handler ignores senderFrame. After a top-level navigation the preload
-// still exposes window.api, so this assertion fails until untrusted origins are rejected.
-it.fails(
+// location.assign to a foreign origin is cancelled, so that document never receives app:versions.
+it(
   'ADV-E09 a foreign origin must not receive app:versions after navigation',
   { meta: ADV_E09 },
   async () => {

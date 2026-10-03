@@ -4,8 +4,9 @@
  * renderer loaded through ELECTRON_RENDERER_URL.
  *
  * base-uri and form-action do not fall back to default-src. They are set on
- * the renderer meta policy. frame-ancestors is ignored in a meta tag, so the
- * dev harness (which serves the renderer itself) and a local file: parent
+ * the renderer meta policy. A foreign form POST is also cancelled by the
+ * main-frame navigation guard. frame-ancestors is ignored in a meta tag, so
+ * the dev harness (which serves the renderer itself) and a local file: parent
  * stay `it.fails`. object-src and connect-src fall back to default-src 'self'
  * and are enforced today.
  *

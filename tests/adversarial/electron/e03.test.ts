@@ -1,7 +1,6 @@
 /**
  * ADV-E03. Assigning `location.href` must not navigate the main window.
- * There is no `will-navigate` handler, so these cases leave the app today
- * and stay `it.fails` until the window remains on its page with `window.api`.
+ * The navigation guard keeps the window on its page with `window.api`.
  *
  * The file case loads a document this test writes. It does not read
  * `/etc/passwd`, whose `root:x:0:0` marker is a Linux passwd format.
@@ -35,7 +34,7 @@ interface Observation {
   apiExposed: boolean
 }
 
-it.fails('ADV-E03 main window does not load a remote origin', { meta: ADV_E03 }, async () => {
+it('ADV-E03 main window does not load a remote origin', { meta: ADV_E03 }, async () => {
   const server = await startHostileServer()
   const observed = await navigate(`${server.origin}/e03`, 'hostile', () =>
     server.requests.map((request) => request.url),
@@ -50,7 +49,7 @@ it.fails('ADV-E03 main window does not load a remote origin', { meta: ADV_E03 },
   })
 })
 
-it.fails('ADV-E03 main window does not load a local file URL', { meta: ADV_E03 }, async () => {
+it('ADV-E03 main window does not load a local file URL', { meta: ADV_E03 }, async () => {
   const dir = mkdtempSync(join(tmpdir(), 'agenteque-e03-'))
   const file = join(dir, 'secret.html')
   writeFileSync(file, `<!doctype html><title>${FILE_MARKER}</title><p>${FILE_MARKER}</p>\n`)

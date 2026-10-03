@@ -127,15 +127,29 @@ it('exits 1 when did-fail-load fires during --smoke-test', async () => {
   const server = await startHostileServer(() => ({
     status: 200,
     headers: { 'content-type': 'text/html; charset=utf-8' },
-    body: page(
-      `try { globalThis.api.notifyRendererReady() } catch (e) {} location.replace(${JSON.stringify(target)})`,
-    ),
+    body: '<!doctype html><meta charset="utf-8"><title>e15</title>',
   }))
   const { launched } = await launchSmoke({
     ELECTRON_RENDERER_URL: `${server.origin}/e15-fail-load`,
   })
+  // A renderer location change to this URL is cancelled, so it never fails a
+  // load. loadURL still emits did-fail-load for the refused target.
+  const triggered = await launched.app
+    .evaluate(async ({ BrowserWindow }, url: string) => {
+      const deadline = Date.now() + 10_000
+      while (Date.now() < deadline) {
+        const win = BrowserWindow.getAllWindows()[0]
+        if (win && !win.webContents.isDestroyed() && !win.webContents.isLoading()) {
+          void win.loadURL(url)
+          return 'navigated'
+        }
+        await new Promise((resolve) => setTimeout(resolve, 5))
+      }
+      return 'no-window'
+    }, target)
+    .catch(() => 'closed')
   const result = await smokeExit(launched, FAST_EXIT_MS)
-  const detail = evidence(result)
+  const detail = `${evidence(result)}\ntrigger=${await triggered}`
   expect(result.code, detail).toBe(1)
   expect(result.stdout, detail).not.toContain('[smoke] OK')
   expect(result.stderr, detail).toContain('did-fail-load')
