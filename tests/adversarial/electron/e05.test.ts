@@ -177,15 +177,6 @@ function effectiveFrameSrc(
   return null
 }
 
-function uriPathIs(blockedURI: string, origin: string, path: string): boolean {
-  try {
-    const url = new URL(blockedURI)
-    return url.origin === origin && url.pathname === path
-  } catch {
-    return false
-  }
-}
-
 function details(value: unknown): string {
   return JSON.stringify(value, null, 2)
 }
@@ -196,35 +187,31 @@ function frameById(frames: FrameRecord[], id: string): FrameRecord {
   return frame
 }
 
-function isInheritedFrameViolation(
-  violation: ViolationRecord,
-  origin: string,
-  path: string,
-): boolean {
-  const directive = violation.effectiveDirective
+/** Chromium's blocked-navigation document. The hostile URL never commits. */
+const BLOCKED_FRAME_HREF = 'chrome-error://chromewebdata/'
+
+function isFrameSrcFallback(violation: ViolationRecord, policy: string): boolean {
   return (
-    uriPathIs(violation.blockedURI, origin, path) &&
+    violation.effectiveDirective === 'frame-src' &&
+    violation.violatedDirective === 'frame-src' &&
     violation.disposition === 'enforce' &&
-    (directive === 'frame-src' || directive === 'child-src' || directive === 'default-src') &&
-    violation.originalPolicy.includes("default-src 'self'")
+    violation.originalPolicy === policy
   )
 }
 
-function isDataFrameViolation(violation: ViolationRecord): boolean {
-  const blocked = violation.blockedURI
-  const directive = violation.effectiveDirective
+function inheritedFrameConsole(line: string, framed: string): boolean {
   return (
-    (blocked === 'data' || blocked.startsWith('data:')) &&
-    violation.disposition === 'enforce' &&
-    (directive === 'frame-src' || directive === 'child-src' || directive === 'default-src') &&
-    violation.originalPolicy.includes("default-src 'self'")
+    line.includes(`Framing '${framed}'`) &&
+    line.includes(`"default-src 'self'"`) &&
+    line.includes("'frame-src' was not explicitly set") &&
+    line.includes("'default-src' is used as a fallback")
   )
 }
 
-function expectFrameStayedBlank(frame: FrameRecord, evidence: string): void {
+function expectFrameBlocked(frame: FrameRecord, evidence: string): void {
   expect(frame.missing, evidence).toBe(false)
   expect(frame.crossOrigin, evidence).toBe(false)
-  expect(frame.href, evidence).toBe('about:blank')
+  expect(frame.href, evidence).toBe(BLOCKED_FRAME_HREF)
   expect(frame.marker, evidence).toBeNull()
 }
 
@@ -588,31 +575,50 @@ it('blocks remote iframes when frame-src is inherited from default-src', async (
       })
       expect(attack.srcdocText, evidence).toBe('srcdoc-ok')
 
+      const policy = attack.policies[0] ?? ''
       const cases = [
-        { id: 'remote-frame', path: '/iframe', src: remote },
-        { id: 'scheme-frame', path: '/iframe-scheme', src: scheme },
-        { id: 'html-frame', path: '/iframe-html', src: html },
-        { id: 'nested-frame', path: '/iframe-nested', src: nested },
+        { id: 'remote-frame', src: remote },
+        { id: 'scheme-frame', src: scheme },
+        { id: 'html-frame', src: html },
+        { id: 'nested-frame', src: nested },
       ]
       for (const item of cases) {
         const frame = frameById(attack.frames, item.id)
         expect(frame.src?.toLowerCase(), evidence).toBe(item.src.toLowerCase())
-        expectFrameStayedBlank(frame, evidence)
-        expect(
-          attack.violations.some((violation) =>
-            isInheritedFrameViolation(violation, server.origin, item.path),
-          ),
-          evidence,
-        ).toBe(true)
+        expectFrameBlocked(frame, evidence)
       }
 
       const dataFrame = frameById(attack.frames, 'data-frame')
       expect(dataFrame.src, evidence).toBe(data)
-      expectFrameStayedBlank(dataFrame, evidence)
+      expectFrameBlocked(dataFrame, evidence)
+
+      // Chromium reports the blocked frame URL as its origin, and a data: URL as empty.
+      const originBlocked = `${server.origin}/`
       expect(
-        attack.violations.some((violation) => isDataFrameViolation(violation)),
+        attack.violations.filter(
+          (violation) =>
+            isFrameSrcFallback(violation, policy) && violation.blockedURI === originBlocked,
+        ),
         evidence,
-      ).toBe(true)
+      ).toHaveLength(cases.length)
+      expect(
+        attack.violations.filter(
+          (violation) =>
+            isFrameSrcFallback(violation, policy) &&
+            (violation.blockedURI === '' ||
+              violation.blockedURI === 'data' ||
+              violation.blockedURI.startsWith('data:')),
+        ),
+        evidence,
+      ).toHaveLength(1)
+      expect(
+        consoleText.filter((line) => inheritedFrameConsole(line, originBlocked)),
+        evidence,
+      ).toHaveLength(cases.length)
+      expect(
+        consoleText.filter((line) => inheritedFrameConsole(line, '')),
+        evidence,
+      ).toHaveLength(1)
       expect(
         server.requests.map((request) => request.url),
         evidence,
