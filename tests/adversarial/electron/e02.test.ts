@@ -1,8 +1,7 @@
 /**
  * ADV-E02. `window.open` must not hand shell.openExternal credential URLs, huge
  * URLs, or IDN/homoglyph hosts, and a 1000-call burst must not fan out into 1000
- * external opens. Cases the app still gets wrong are `it.fails` so the suite stays
- * green until the handler is fixed.
+ * external opens.
  */
 import type { ElectronApplication, Page } from 'playwright'
 import { expect, it } from 'vitest'
@@ -119,7 +118,7 @@ async function openBurst(page: Page): Promise<number> {
   }
 }
 
-it.fails('ADV-E02 does not forward http credentials to shell.openExternal', async () => {
+it('ADV-E02 does not forward http credentials to shell.openExternal', async () => {
   const session = await launchRecordingApp()
   try {
     for (const url of CREDENTIAL_URLS) await openUrl(session.page, url)
@@ -130,7 +129,7 @@ it.fails('ADV-E02 does not forward http credentials to shell.openExternal', asyn
   }
 })
 
-it.fails('ADV-E02 does not forward huge URLs to shell.openExternal', async () => {
+it('ADV-E02 does not forward huge URLs to shell.openExternal', async () => {
   const session = await launchRecordingApp()
   try {
     await openUrl(session.page, `http://127.0.0.1/${'A'.repeat(HUGE_PATH_LENGTH)}`)
@@ -143,7 +142,7 @@ it.fails('ADV-E02 does not forward huge URLs to shell.openExternal', async () =>
   }
 })
 
-it.fails('ADV-E02 does not open IDN homoglyph hosts externally', async () => {
+it('ADV-E02 does not open IDN homoglyph hosts externally', async () => {
   const session = await launchRecordingApp()
   try {
     for (const url of HOMOGLYPH_URLS) await openUrl(session.page, url)
@@ -156,7 +155,7 @@ it.fails('ADV-E02 does not open IDN homoglyph hosts externally', async () => {
   }
 })
 
-it.fails('ADV-E02 cannot fan a 1000-call window.open burst out into 1000 external opens', async () => {
+it('ADV-E02 cannot fan a 1000-call window.open burst out into 1000 external opens', async () => {
   const session = await launchRecordingApp()
   try {
     const attempted = await openBurst(session.page)

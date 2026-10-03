@@ -5,6 +5,22 @@ import { type AppVersions, IpcChannel } from '../shared/ipc'
 const isSmokeTest = process.argv.includes('--smoke-test')
 const SMOKE_TIMEOUT_MS = 20_000
 const SMOKE_HOLD_MS = 2_000
+const MAX_EXTERNAL_URL_LENGTH = 2048
+const MAX_EXTERNAL_OPENS = 8
+
+function externalUrlAllowed(raw: string): boolean {
+  if (raw.length > MAX_EXTERNAL_URL_LENGTH) return false
+  let parsed: URL
+  try {
+    parsed = new URL(raw)
+  } catch {
+    return false
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false
+  if (parsed.username !== '' || parsed.password !== '') return false
+  if (parsed.hostname.split('.').some((label) => label.startsWith('xn--'))) return false
+  return true
+}
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -22,8 +38,10 @@ function createWindow(): BrowserWindow {
 
   win.once('ready-to-show', () => win.show())
 
+  let externalOpens = 0
   win.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('https://') || url.startsWith('http://')) {
+    if (externalOpens < MAX_EXTERNAL_OPENS && externalUrlAllowed(url)) {
+      externalOpens += 1
       void shell.openExternal(url)
     }
     return { action: 'deny' }
