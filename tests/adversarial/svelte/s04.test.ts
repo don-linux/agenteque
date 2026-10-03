@@ -86,7 +86,7 @@ it('does not mount or call the bridge when #app is missing', async () => {
   expect(doc.querySelector('h1')).toBeNull()
 })
 
-it.fails('ADV-S04 rejects a duplicate #app before mount', async () => {
+it('ADV-S04 rejects a duplicate #app before mount', async () => {
   const doc = documentOf()
   const decoy = doc.createElement('div')
   decoy.id = 'app'
@@ -104,7 +104,7 @@ it.fails('ADV-S04 rejects a duplicate #app before mount', async () => {
   expect(doc.querySelectorAll('h1')).toHaveLength(0)
 })
 
-it.fails('ADV-S04 does not mount a second app into the same document', async () => {
+it('ADV-S04 does not mount a second app into the same document', async () => {
   const doc = documentOf()
   const target = doc.createElement('div')
   target.id = 'app'
