@@ -1,6 +1,8 @@
 import { spawn, spawnSync } from 'node:child_process'
-import { existsSync, rmSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
+import { _electron as electron } from 'playwright'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { distDir, root } from './paths'
 
@@ -47,5 +49,61 @@ describe('packaged app smoke test', () => {
     expect(output).not.toContain('[smoke] FAIL')
     expect(code, output).toBe(0)
     expect(elapsedMs).toBeGreaterThanOrEqual(2_000)
+  })
+
+  /**
+   * La pantalla de IDE reparte el alto con `flex`, así que una raíz de montaje
+   * sin alto propio la colapsa a cero píxeles: el DOM está entero, no hay ni un
+   * error, y la ventana sale en blanco. Sólo se ve midiendo lo pintado.
+   */
+  it('paints the IDE screen instead of collapsing it to zero pixels', async () => {
+    // Directorio de datos propio: con el del usuario la carpeta ya tendría
+    // vistas guardadas y el modal de carpetas visibles no aparecería.
+    const userData = mkdtempSync(join(tmpdir(), 'agenteque-build-'))
+    const app = await electron.launch({
+      executablePath: executable,
+      args: ['--no-sandbox', `--user-data-dir=${userData}`],
+      cwd: root,
+      timeout: 60_000,
+      env: { ...process.env, DISPLAY: process.env.DISPLAY ?? ':1' },
+    })
+
+    try {
+      const page = await app.firstWindow({ timeout: 30_000 })
+      await page.getByRole('heading', { name: 'agenteque' }).waitFor({ timeout: 20_000 })
+
+      await page.getByRole('button', { name: 'Abrir carpeta' }).click()
+      await page.getByRole('button', { name: 'Todas' }).click()
+      await page.getByRole('button', { name: 'Confirmar' }).click()
+
+      // `waitFor` exige que el elemento tenga caja, así que una pantalla
+      // colapsada a cero píxeles no pasa de aquí.
+      const editorHint = page.getByText('Selecciona un archivo.')
+      await editorHint.waitFor({ timeout: 20_000 })
+      expect((await editorHint.boundingBox())?.height ?? 0).toBeGreaterThan(0)
+
+      const footer = page.locator('footer')
+      await footer.waitFor({ timeout: 20_000 })
+      expect((await footer.boundingBox())?.height ?? 0).toBeGreaterThan(0)
+
+      const sizes = await page.evaluate(() => {
+        const dom = globalThis as unknown as {
+          document: {
+            getElementById(id: string): { clientHeight: number } | null
+            documentElement: { clientHeight: number }
+          }
+        }
+        return {
+          root: dom.document.getElementById('app')?.clientHeight ?? 0,
+          viewport: dom.document.documentElement.clientHeight,
+        }
+      })
+      // Sin alto propio la raíz se queda en el alto de su contenido, que es
+      // una fracción de la ventana. El margen absorbe el redondeo de píxeles.
+      expect(sizes.root).toBeGreaterThanOrEqual(sizes.viewport - 2)
+    } finally {
+      await app.close()
+      rmSync(userData, { recursive: true, force: true })
+    }
   })
 })

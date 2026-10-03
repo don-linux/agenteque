@@ -31,6 +31,14 @@ describe('#925: Svelte renderer builds with Vite 8', () => {
     expect(bundle).toContain('Configuración')
   })
 
+  it('gives the mount root its own height so the IDE grid can fill the window', () => {
+    const html = readOut('renderer/index.html')
+    const styleHref = html.match(/<link[^>]+href="\.\/(assets\/[^"]+\.css)"/)?.[1]
+    expect(styleHref, 'index.html should reference a stylesheet').toBeDefined()
+
+    expect(readOut(`renderer/${styleHref}`)).toMatch(/#app\s*\{[^}]*height:\s*100%/)
+  })
+
   it('ships the bundled fonts and the window icon with the renderer', () => {
     expect(existsSync(resolve(outDir, 'renderer/icon.png'))).toBe(true)
 

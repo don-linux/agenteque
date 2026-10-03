@@ -54,6 +54,15 @@ body {
   margin: 0;
 }
 
+/*
+ * El shell y la rejilla del workspace reparten el alto con `flex` y `100%`, así
+ * que la raíz del montaje tiene que tener alto propio: sin esto la pantalla de
+ * IDE se colapsa a cero píxeles sin dar ningún error.
+ */
+#app {
+  height: 100%;
+}
+
 body {
   background: var(--bg);
   color: var(--text);
