@@ -3,10 +3,11 @@
  * (fetch or img exfiltration) must hold on the built renderer and on the dev
  * renderer loaded through ELECTRON_RENDERER_URL.
  *
- * base-uri and form-action do not fall back to default-src. frame-ancestors is
- * ignored in a meta tag. Those three are `it.fails` until the secure result
- * holds. object-src and connect-src fall back to default-src 'self' and are
- * enforced today.
+ * base-uri and form-action do not fall back to default-src. They are set on
+ * the renderer meta policy. frame-ancestors is ignored in a meta tag, so the
+ * dev harness (which serves the renderer itself) and a local file: parent
+ * stay `it.fails`. object-src and connect-src fall back to default-src 'self'
+ * and are enforced today.
  *
  * WebFrameMain.url stays on the blocked URL when frame-ancestors rejects a
  * response, so embed checks read location.href inside the child frame.
@@ -98,7 +99,7 @@ type RendererGlobal = typeof globalThis & {
 }
 
 for (const mode of MODES) {
-  it.fails(`ADV-E12 ${mode} base-uri blocks a foreign base URL`, { meta: ADV_E12 }, async () => {
+  it(`ADV-E12 ${mode} base-uri blocks a foreign base URL`, { meta: ADV_E12 }, async () => {
     await withMode(mode, async ({ page, hostile }) => {
       const result = await page.evaluate(installForeignBase, `${hostile.origin}/owned/`)
       expect(result.after).toBe(result.before)
@@ -107,38 +108,34 @@ for (const mode of MODES) {
     })
   })
 
-  it.fails(
-    `ADV-E12 ${mode} form-action blocks a foreign form POST`,
-    { meta: ADV_E12 },
-    async () => {
-      await withMode(mode, async ({ page, home, hostile }) => {
-        const action = `${hostile.origin}/e12-form`
-        const left = page
-          .waitForURL((url) => url.href !== home, { timeout: SETTLE_MS })
-          .then(() => true)
-          .catch(() => false)
-        await page.evaluate(submitForeignForm, action)
-        const navigated = await left
-        const posted = await requestArrived(
-          hostile,
-          (request) =>
-            request.method === 'POST' &&
-            request.url.split('?')[0] === '/e12-form' &&
-            request.body.toString('utf8').includes('secret=e12-token'),
-          navigated ? 1_000 : SETTLE_MS,
-        )
-        const landed = (await page.locator('body').innerText()).includes('e12-landed')
-        const apiExposed = await page.evaluate(preloadApiExposed)
-        expect({ url: page.url(), navigated, posted, landed, apiExposed }).toEqual({
-          url: home,
-          navigated: false,
-          posted: false,
-          landed: false,
-          apiExposed: true,
-        })
+  it(`ADV-E12 ${mode} form-action blocks a foreign form POST`, { meta: ADV_E12 }, async () => {
+    await withMode(mode, async ({ page, home, hostile }) => {
+      const action = `${hostile.origin}/e12-form`
+      const left = page
+        .waitForURL((url) => url.href !== home, { timeout: SETTLE_MS })
+        .then(() => true)
+        .catch(() => false)
+      await page.evaluate(submitForeignForm, action)
+      const navigated = await left
+      const posted = await requestArrived(
+        hostile,
+        (request) =>
+          request.method === 'POST' &&
+          request.url.split('?')[0] === '/e12-form' &&
+          request.body.toString('utf8').includes('secret=e12-token'),
+        navigated ? 1_000 : SETTLE_MS,
+      )
+      const landed = (await page.locator('body').innerText()).includes('e12-landed')
+      const apiExposed = await page.evaluate(preloadApiExposed)
+      expect({ url: page.url(), navigated, posted, landed, apiExposed }).toEqual({
+        url: home,
+        navigated: false,
+        posted: false,
+        landed: false,
+        apiExposed: true,
       })
-    },
-  )
+    })
+  })
 
   it(`ADV-E12 ${mode} object-src blocks a foreign object and embed`, async () => {
     await withMode(mode, async ({ page, hostile }) => {

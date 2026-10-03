@@ -19,5 +19,10 @@ export default defineConfig({
       },
     },
     plugins: [svelte()],
+    server: {
+      headers: {
+        'Content-Security-Policy': "frame-ancestors 'none'",
+      },
+    },
   },
 })

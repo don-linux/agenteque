@@ -1,7 +1,8 @@
 /**
  * ADV-E04. A 302, a meta refresh, a form submit, and history must not move
  * the main window onto an external origin. There is no will-navigate or
- * will-redirect handler, so these cases leave the app today and stay
+ * will-redirect handler. The form case stays because the renderer CSP sets
+ * form-action 'none'. The other cases leave the app today and stay
  * `it.fails` until the window remains on its page. When a case starts
  * passing, drop `it.fails` so the assertion guards the fix.
  */
@@ -48,7 +49,7 @@ it.fails('ADV-E04 main window does not follow a meta refresh', { meta: ADV_E04 }
   expect(observed).toEqual(stayedOnApp(observed))
 })
 
-it.fails('ADV-E04 main window does not follow a form submit', { meta: ADV_E04 }, async () => {
+it('ADV-E04 main window does not follow a form submit', { meta: ADV_E04 }, async () => {
   const observed = await attack('landed-form', (page, origin) =>
     page.evaluate(submitForm, `${origin}/form`),
   )
