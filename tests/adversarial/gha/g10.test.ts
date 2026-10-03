@@ -1,8 +1,7 @@
 /**
  * ADV-G10. The publish job's Checksums step must hash every file in dist/.
  * Names that start with `-`, contain spaces or newlines, or are blank must stay
- * filenames. GNU sha256sum still reads stdin for an operand named `-` after `--`,
- * so that case stays `it.fails` until the hash is of the file itself.
+ * filenames. A leading `./` keeps an operand named `-` from being read as stdin.
  */
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
@@ -247,7 +246,7 @@ it('hashes whitespace-only names and records no empty name', async () => {
   }
 })
 
-it.fails('ADV-G10 hashes a file named - as the artifact bytes', { meta: ADV_G10 }, async () => {
+it('ADV-G10 hashes a file named - as the artifact bytes', { meta: ADV_G10 }, async () => {
   const files = {
     ...artifacts,
     '-': 'not-stdin',
