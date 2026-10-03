@@ -269,7 +269,7 @@ async function directoryArtifactProblems(): Promise<string[]> {
   return problems
 }
 
-it.fails.skipIf(!directoryLooksNonEmpty)(
+it.skipIf(!directoryLooksNonEmpty).fails(
   'ADV-G05 rejects a directory in place of an artifact',
   { meta: ADV_G05 },
   async () => {

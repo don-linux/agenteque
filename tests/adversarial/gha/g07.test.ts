@@ -143,7 +143,7 @@ async function directoryNotesResult(): Promise<{ exitCode: number | null; stdout
   }
 }
 
-it.fails.skipIf(!notesDirectoryLooksNonEmpty)(
+it.skipIf(!notesDirectoryLooksNonEmpty).fails(
   'ADV-G07 rejects a directory in place of the release notes file',
   async () => {
     const result = await directoryNotesResult()
