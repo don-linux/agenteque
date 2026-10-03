@@ -234,7 +234,7 @@ it('activates from Enter and Space once and ignores other keyboard input', async
 
 // Default button type is submit, so Enter inside an ancestor form submits it.
 // happy-dom does not synthesize the click; fireClick is the user-agent click.
-it.fails('ADV-S05 keyboard activation does not submit an ancestor form', async () => {
+it('ADV-S05 keyboard activation does not submit an ancestor form', async () => {
   const mounted = await mountComponent(Counter)
   const button = requireButton(mounted)
   const view = mounted.window
