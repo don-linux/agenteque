@@ -1,8 +1,19 @@
-import { readdirSync, unlinkSync } from 'node:fs'
+import { existsSync, readdirSync, unlinkSync } from 'node:fs'
 import { join, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { app, BrowserWindow, ipcMain, session, shell, type WebFrameMain } from 'electron'
+import {
+  type AppConfig,
+  type AppearanceSettings,
+  type LayoutSettings,
+  type TerminalSettings,
+  withoutRecent,
+  withRecent,
+  withWorkspaceView,
+  type WorkspaceView,
+} from '../shared/config'
 import { type AppVersions, IpcChannel } from '../shared/ipc'
+import { ConfigStore } from './config-store'
 
 const isSmokeTest = process.argv.includes('--smoke-test')
 const SMOKE_TIMEOUT_MS = 20_000
@@ -71,12 +82,28 @@ function installNavigationGuard(contents: Electron.WebContents): void {
   })
 }
 
+/**
+ * Empaquetada la copia viaja con el renderer; en desarrollo `out/renderer` no
+ * existe y se usa el original que consume electron-builder.
+ */
+function windowIcon(): string | undefined {
+  const candidates = [
+    join(__dirname, '../renderer/icon.png'),
+    join(app.getAppPath(), 'build', 'icon.png'),
+  ]
+  return candidates.find((file) => existsSync(file))
+}
+
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
-    width: 960,
-    height: 700,
+    // Tres paneles (árbol, editor y terminal) no caben en 960×700.
+    width: 1280,
+    height: 800,
+    minWidth: 720,
+    minHeight: 480,
     show: false,
     autoHideMenuBar: true,
+    icon: windowIcon(),
     webPreferences: {
       preload: join(__dirname, '../preload/index.cjs'),
       contextIsolation: true,
@@ -190,6 +217,43 @@ function registerIpcHandlers(): void {
       node: process.versions.node,
     }
   })
+
+  registerConfigHandlers(new ConfigStore(app.getPath('userData')))
+}
+
+function handleConfig(channel: string, run: (payload: unknown) => AppConfig): void {
+  ipcMain.handle(channel, (event, payload: unknown): AppConfig => {
+    if (!isTrustedSender(event.senderFrame)) {
+      throw new Error(`Rejected untrusted ${channel} sender`)
+    }
+    return run(payload)
+  })
+}
+
+/**
+ * Un canal por comando, como en el backend que se porta, y todos devuelven el
+ * `AppConfig` completo ya saneado: el renderer nunca ve lo que había en disco.
+ */
+function registerConfigHandlers(store: ConfigStore): void {
+  handleConfig(IpcChannel.configLoad, () => store.load())
+  handleConfig(IpcChannel.configSaveTerminal, (payload) =>
+    store.update((config) => ({ ...config, terminal: payload as TerminalSettings })),
+  )
+  handleConfig(IpcChannel.configSaveAppearance, (payload) =>
+    store.update((config) => ({ ...config, appearance: payload as AppearanceSettings })),
+  )
+  handleConfig(IpcChannel.configSaveLayout, (payload) =>
+    store.update((config) => ({ ...config, layout: payload as LayoutSettings })),
+  )
+  handleConfig(IpcChannel.configSaveWorkspaceView, (payload) =>
+    store.update((config) => withWorkspaceView(config, payload as WorkspaceView)),
+  )
+  handleConfig(IpcChannel.configRecordRecent, (payload) =>
+    store.update((config) => withRecent(config, String(payload ?? ''))),
+  )
+  handleConfig(IpcChannel.configRemoveRecent, (payload) =>
+    store.update((config) => withoutRecent(config, String(payload ?? ''))),
+  )
 }
 
 /**
