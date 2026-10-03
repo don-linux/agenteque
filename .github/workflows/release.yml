@@ -55,7 +55,7 @@ jobs:
       - name: Release notes exist
         run: |
           notes="docs/release-notes/$TAG.md"
-          if [ ! -s "$notes" ]; then
+          if [ -L "$notes" ] || [ ! -f "$notes" ] || [ ! -s "$notes" ]; then
             echo "::error::Missing $notes; see docs/HOW-TO-CHANGELOG.md"
             exit 1
           fi

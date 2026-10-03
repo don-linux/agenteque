@@ -15,10 +15,9 @@ import { readWorkflowYaml, runWorkflowStep } from '../helpers/workflow'
 const yaml = readWorkflowYaml('release.yml')
 
 /**
- * `[ -s ]` follows st_size. A directory that contains a file is still 4096
- * bytes here, so the notes step accepts it and the case stays `it.fails`.
- * A zero-size directory is already rejected, so that registration runs and
- * the `it.fails` one is skipped.
+ * A directory's st_size is often non-zero even though it is not a regular
+ * file. One registration runs when that size is positive and the other when
+ * it is zero. Both expect the notes step to reject the directory.
  */
 function notesDirectorySize(): number {
   const root = mkdtempSync(resolve(tmpdir(), 'agenteque-g07-dir-'))
@@ -111,7 +110,7 @@ it('accepts a regular non-empty release notes file', async () => {
   }
 })
 
-it.fails('ADV-G07 rejects a symlink in place of the release notes file', async () => {
+it('ADV-G07 rejects a symlink in place of the release notes file', async () => {
   const result = await runNotesCheck({
     prepare: (dir) => {
       const outside = resolve(dir, 'outside-notes.txt')
@@ -143,7 +142,7 @@ async function directoryNotesResult(): Promise<{ exitCode: number | null; stdout
   }
 }
 
-it.skipIf(!notesDirectoryLooksNonEmpty).fails(
+it.skipIf(!notesDirectoryLooksNonEmpty)(
   'ADV-G07 rejects a directory in place of the release notes file',
   async () => {
     const result = await directoryNotesResult()
