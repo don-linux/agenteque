@@ -233,7 +233,10 @@ function armSmokeTest(win: BrowserWindow): void {
       return
     }
     readyCount += 1
-    const count = readyCount
+    if (readyCount > 1 && hold) {
+      clearTimeout(hold)
+      hold = undefined
+    }
     void event.sender
       .executeJavaScript(`document.querySelector('h1')?.textContent === 'agenteque'`)
       .then((mounted: unknown) => {
@@ -242,8 +245,11 @@ function armSmokeTest(win: BrowserWindow): void {
           finish(1, 'renderer-ready before the renderer mounted')
           return
         }
-        if (count > 1) {
-          finish(1, 'duplicate renderer-ready')
+        if (readyCount > 1) {
+          // A second signal must not print OK. Exit after the same hold the
+          // success path uses so the duplicate IPC can be observed first.
+          if (hold) clearTimeout(hold)
+          hold = setTimeout(() => finish(1, 'duplicate renderer-ready'), SMOKE_HOLD_MS)
           return
         }
         console.log('[smoke] renderer ready')
