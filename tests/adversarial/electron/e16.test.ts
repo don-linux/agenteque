@@ -2,9 +2,7 @@
  * ADV-E16. `--smoke-test` may print `[smoke] OK` and exit 0 only after the
  * renderer has mounted, and only for a single ready signal that arrives in time.
  * A signal sent before mount, a second signal, or a signal after the 20s deadline
- * must not be reported as OK. The early and duplicate signals false-OK today, so those
- * cases stay `it.fails` until the gate rejects them. A signal after the deadline
- * already exits 1.
+ * must not be reported as OK. A signal after the deadline already exits 1.
  */
 import { setTimeout as delay } from 'node:timers/promises'
 import { expect, it } from 'vitest'
@@ -87,7 +85,7 @@ function assertNoFalseOk(code: number | null, output: string): void {
   expect(code, output).not.toBe(0)
 }
 
-it.fails(
+it(
   'ADV-E16 a ready signal before the renderer mounts must not report OK',
   { meta: ADV_E16 },
   async () => {
@@ -111,7 +109,7 @@ it.fails(
   },
 )
 
-it.fails('ADV-E16 a second ready signal must not report OK', { meta: ADV_E16 }, async () => {
+it('ADV-E16 a second ready signal must not report OK', { meta: ADV_E16 }, async () => {
   const launched = await launchSmoke()
   const page = await launched.app.firstWindow({ timeout: 15_000 })
   await page.locator('.versions code').first().waitFor({ timeout: 10_000 })

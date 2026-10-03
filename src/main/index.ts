@@ -116,38 +116,67 @@ function registerIpcHandlers(): void {
   })
 }
 
-function failSmokeTest(reason: string): void {
-  console.error(`[smoke] FAIL: ${reason}`)
-  app.exit(1)
-}
-
 /**
  * `--smoke-test`: exit 0 once the renderer reports it mounted and stays healthy for
  * SMOKE_HOLD_MS; exit 1 on load failure, renderer crash, console error or timeout.
  */
 function armSmokeTest(win: BrowserWindow): void {
+  let settled = false
+  let readyCount = 0
+  let hold: ReturnType<typeof setTimeout> | undefined
+
+  const finish = (code: number, reason?: string): void => {
+    if (settled) return
+    settled = true
+    clearTimeout(timeout)
+    if (hold) clearTimeout(hold)
+    if (code === 0) console.log('[smoke] OK')
+    else console.error(`[smoke] FAIL: ${reason}`)
+    app.exit(code)
+  }
+
   const timeout = setTimeout(
-    () => failSmokeTest(`renderer not ready after ${SMOKE_TIMEOUT_MS}ms`),
+    () => finish(1, `renderer not ready after ${SMOKE_TIMEOUT_MS}ms`),
     SMOKE_TIMEOUT_MS,
   )
 
   win.webContents.on('did-fail-load', (_event, code, description) =>
-    failSmokeTest(`did-fail-load ${code} ${description}`),
+    finish(1, `did-fail-load ${code} ${description}`),
   )
   win.webContents.on('render-process-gone', (_event, details) =>
-    failSmokeTest(`render-process-gone ${details.reason}`),
+    finish(1, `render-process-gone ${details.reason}`),
   )
   win.webContents.on('console-message', (event) => {
-    if (event.level === 'error') failSmokeTest(`renderer console error: ${event.message}`)
+    if (event.level === 'error') finish(1, `renderer console error: ${event.message}`)
   })
 
-  ipcMain.once(IpcChannel.rendererReady, () => {
-    clearTimeout(timeout)
-    console.log('[smoke] renderer ready')
-    setTimeout(() => {
-      console.log('[smoke] OK')
-      app.exit(0)
-    }, SMOKE_HOLD_MS)
+  ipcMain.on(IpcChannel.rendererReady, (event) => {
+    if (settled) return
+    if (event.sender !== win.webContents) {
+      finish(1, 'renderer-ready from an unexpected sender')
+      return
+    }
+    readyCount += 1
+    const count = readyCount
+    void event.sender
+      .executeJavaScript(`document.querySelector('h1')?.textContent === 'agenteque'`)
+      .then((mounted: unknown) => {
+        if (settled) return
+        if (mounted !== true) {
+          finish(1, 'renderer-ready before the renderer mounted')
+          return
+        }
+        if (count > 1) {
+          finish(1, 'duplicate renderer-ready')
+          return
+        }
+        console.log('[smoke] renderer ready')
+        hold = setTimeout(() => finish(0), SMOKE_HOLD_MS)
+      })
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error)
+        finish(1, `renderer-ready before the renderer mounted: ${message}`)
+      })
   })
 }
 
