@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, inject, it } from 'vitest'
 import { outDir } from './paths'
@@ -27,8 +27,18 @@ describe('#925: Svelte renderer builds with Vite 8', () => {
     expect(scriptSrc, 'index.html should reference a JS bundle').toBeDefined()
 
     const bundle = readOut(`renderer/${scriptSrc}`)
-    expect(bundle).toContain('Versions (via IPC)')
-    expect(bundle).toContain('count is')
+    expect(bundle).toContain('Abre una carpeta para ver y editar sus archivos markdown.')
+    expect(bundle).toContain('Configuración')
+  })
+
+  it('ships the bundled fonts and the window icon with the renderer', () => {
+    expect(existsSync(resolve(outDir, 'renderer/icon.png'))).toBe(true)
+
+    const assets = readdirSync(resolve(outDir, 'renderer/assets'))
+    expect(assets.some((name) => name.startsWith('inter-') && name.endsWith('.woff2'))).toBe(true)
+    expect(
+      assets.some((name) => name.startsWith('jetbrains-mono-') && name.endsWith('.woff2')),
+    ).toBe(true)
   })
 })
 

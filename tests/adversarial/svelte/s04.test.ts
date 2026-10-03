@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, beforeEach, expect, it, vi } from 'vitest'
-import Counter from '../../../src/renderer/src/lib/Counter.svelte'
+import Counter from '../helpers/Counter.svelte'
 import { type FakeApi, type MountedComponent, mountComponent } from '../helpers/svelte'
 
 const BOOTSTRAP = '../../../src/renderer/src/main.ts'
@@ -113,17 +113,14 @@ it('ADV-S04 does not mount a second app into the same document', async () => {
   const first = await bootApp()
   first.flush()
   await expect.poll(() => calls.ready).toBe(1)
-  expect(calls.versions).toBe(1)
   expect(target.querySelectorAll('h1')).toHaveLength(1)
   expect(target.textContent).toContain('agenteque')
-  expect(target.textContent).toContain('9.9.9')
 
   // resetModules drops module state, same as an HMR invalidation of main.ts.
   // A second evaluation must not stack another App or another renderer-ready.
   await expect(bootApp()).rejects.toThrow('renderer already mounted')
 
   expect(doc.querySelectorAll('h1')).toHaveLength(1)
-  expect(calls.versions).toBe(1)
   expect(calls.ready).toBe(1)
-  expect(target.textContent).toContain('9.9.9')
+  expect(target.textContent).toContain('agenteque')
 })

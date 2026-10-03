@@ -35,6 +35,12 @@ const DOM_GLOBALS = [
   'Range',
   'HTMLButtonElement',
   'HTMLInputElement',
+  'HTMLMediaElement',
+  'HTMLSelectElement',
+  'HTMLTextAreaElement',
+  'HTMLOptionElement',
+  'HTMLLabelElement',
+  'HTMLUListElement',
   'HTMLAnchorElement',
   'HTMLFormElement',
   'HTMLImageElement',
@@ -53,6 +59,7 @@ const BOUND_METHODS = ['requestAnimationFrame', 'cancelAnimationFrame', 'getComp
  * Assigned before `mount`.
  */
 export interface FakeApi {
+  platform?: string
   getVersions?: () => unknown
   notifyRendererReady?: () => void
 }
