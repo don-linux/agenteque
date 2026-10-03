@@ -1,0 +1,41 @@
+{
+  "name": "agenteque",
+  "version": "0.0.1",
+  "private": true,
+  "description": "agenteque desktop app (Electron + Svelte 5)",
+  "license": "MIT",
+  "author": "Fernando Diaz",
+  "type": "module",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "lint": "oxlint",
+    "fmt": "oxfmt",
+    "fmt:check": "oxfmt --check",
+    "check": "svelte-check --tsconfig ./tsconfig.web.json && tsc --noEmit -p tsconfig.node.json",
+    "test": "vitest run --project unit",
+    "test:build": "vitest run --project build",
+    "dist": "electron-vite build && electron-builder",
+    "postinstall": "install-electron"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "7.3.1",
+    "@types/node": "24.19.1",
+    "electron": "44.5.1",
+    "electron-builder": "26.15.3",
+    "electron-vite": "6.0.0-beta.5",
+    "oxfmt": "0.71.0",
+    "oxlint": "1.86.0",
+    "svelte": "5.57.1",
+    "svelte-check": "4.7.6",
+    "typescript": "6.0.3",
+    "vite": "8.3.2",
+    "vitest": "5.0.3"
+  },
+  "engines": {
+    "node": "^22.12.0 || >=24.0.0"
+  },
+  "packageManager": "pnpm@10.33.3"
+}
