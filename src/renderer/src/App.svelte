@@ -20,15 +20,21 @@
   }
 
   onMount(() => {
+    let cancelled = false
     window.api.notifyRendererReady()
     void Promise.resolve(window.api.getVersions()).then(
       (loaded) => {
+        if (cancelled) return
         versions = loaded
       },
       () => {
+        if (cancelled) return
         versions = null
       },
     )
+    return () => {
+      cancelled = true
+    }
   })
 </script>
 
