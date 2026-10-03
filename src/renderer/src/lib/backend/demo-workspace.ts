@@ -233,16 +233,42 @@ class DemoWorkspace implements WorkspaceBackend {
     }
   }
 
-  /** Insensible a mayúsculas: es el lado seguro en Windows y macOS. */
+  /**
+   * Insensible a mayúsculas en cada tramo, no solo en el último. Un hermano
+   * que solo cambia de caja, o un fichero que iba a ser ancestro, rechaza la
+   * ruta entera. `except` solo exime el destino final de un renombrado.
+   */
   #requireFree(path: string, except?: string): void {
-    const parent = parentOf(path)
-    const name = baseNameOf(path)
+    const segments = path.split('/')
+    let parent = ''
 
+    for (let index = 0; index < segments.length; index += 1) {
+      const segment = segments[index] ?? ''
+      const isLast = index === segments.length - 1
+      const requested = parent === '' ? segment : `${parent}/${segment}`
+      const hit = this.#sibling(parent, segment, isLast ? except : undefined)
+
+      if (hit === null) return
+
+      if (!isLast) {
+        if (hit !== requested || this.#files.has(hit) || !this.#dirs.has(hit)) {
+          throw new Error(`\`${segment}\` ya existe`)
+        }
+        parent = hit
+        continue
+      }
+
+      throw new Error(`\`${segment}\` ya existe`)
+    }
+  }
+
+  #sibling(parent: string, name: string, except?: string): string | null {
     for (const candidate of [...this.#dirs, ...this.#files.keys()]) {
       if (candidate === except) continue
       if (parentOf(candidate) !== parent) continue
-      if (sameName(baseNameOf(candidate), name)) throw new Error(`\`${name}\` ya existe`)
+      if (sameName(baseNameOf(candidate), name)) return candidate
     }
+    return null
   }
 }
 

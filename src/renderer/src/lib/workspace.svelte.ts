@@ -7,6 +7,7 @@ import { editorSession } from '$lib/editor-session.svelte'
 import { addTab, nextActiveAfterClose, removeTab } from '$lib/editor-tabs'
 import {
   baseNameOf,
+  createPathConflict,
   folderNameOf,
   joinTreePath,
   normalizeNewName,
@@ -14,7 +15,6 @@ import {
   parentDirOf,
   planMove,
   remapPathPrefix,
-  siblingExists,
   siblingExistsExcept,
   type DraftKind,
 } from '$lib/file-tree'
@@ -490,9 +490,10 @@ class Workspace {
 
     const path = joinTreePath(parent, normalized.name)
     const name = baseNameOf(path)
+    const conflict = createPathConflict(this.tree, path)
 
-    if (siblingExists(this.tree, parentDirOf(path), name)) {
-      fileTree.failDraft(`\`${name}\` ya existe`)
+    if (conflict) {
+      fileTree.failDraft(conflict)
       return false
     }
 

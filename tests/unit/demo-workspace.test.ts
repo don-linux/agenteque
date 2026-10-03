@@ -65,6 +65,33 @@ describe('demo workspace writes', () => {
     await expect(demoWorkspace.createEntry(DEMO_ROOT, 'NOTAS', 'dir')).rejects.toThrow('ya existe')
   })
 
+  it('refuses a nested path whose folder only differs in case', async () => {
+    await expect(demoWorkspace.createEntry(DEMO_ROOT, 'NOTAS/nueva.md', 'file')).rejects.toThrow(
+      'ya existe',
+    )
+
+    const tree = await demoWorkspace.listContextTree(DEMO_ROOT, null)
+
+    expect(paths(tree)).toContain('notas')
+    expect(paths(tree)).toContain('notas/ideas.md')
+    expect(paths(tree)).not.toContain('NOTAS')
+    expect(paths(tree)).not.toContain('NOTAS/nueva.md')
+  })
+
+  it('refuses to turn a file into an ancestor', async () => {
+    const before = await demoWorkspace.readMarkdown(DEMO_ROOT, 'README.md')
+
+    await expect(
+      demoWorkspace.createEntry(DEMO_ROOT, 'README.md/extra.md', 'file'),
+    ).rejects.toThrow('ya existe')
+
+    const tree = await demoWorkspace.listContextTree(DEMO_ROOT, null)
+
+    expect(paths(tree)).toContain('README.md')
+    expect(paths(tree)).not.toContain('README.md/extra.md')
+    await expect(demoWorkspace.readMarkdown(DEMO_ROOT, 'README.md')).resolves.toBe(before)
+  })
+
   it('moves a folder with everything inside it', async () => {
     await demoWorkspace.moveEntry(DEMO_ROOT, 'notas', 'docs/notas', 'dir')
     const tree = await demoWorkspace.listContextTree(DEMO_ROOT, null)

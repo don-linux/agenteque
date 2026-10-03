@@ -3,6 +3,7 @@ import {
   ancestorsOf,
   baseNameOf,
   canMoveEntry,
+  createPathConflict,
   draftParentFor,
   draftParentForCommand,
   dropParentFor,
@@ -427,6 +428,22 @@ describe('siblingExists', () => {
     expect(siblingExists(nodes, 'docs-viejos', 'antiguo.md')).toBe(true)
     expect(siblingExists(nodes, 'docs-viejos', 'guia.md')).toBe(false)
     expect(siblingExists(nodes, 'docs', 'antiguo.md')).toBe(false)
+  })
+})
+
+describe('createPathConflict', () => {
+  it('rejects a nested path whose folder only differs in case', () => {
+    const nodes = [dir('notas', 'notas', [file('ideas.md', 'notas/ideas.md')])]
+
+    expect(createPathConflict(nodes, 'NOTAS/nueva.md')).toBe('`NOTAS` ya existe')
+    expect(createPathConflict(tree(), 'docs/SUB/extra.md')).toBe('`SUB` ya existe')
+    expect(createPathConflict(nodes, 'notas/nueva.md')).toBeNull()
+  })
+
+  it('rejects turning a file into an ancestor', () => {
+    expect(createPathConflict(tree(), 'README.md/extra.md')).toBe('`README.md` ya existe')
+    expect(createPathConflict(tree(), 'docs/guia.md/extra.md')).toBe('`guia.md` ya existe')
+    expect(createPathConflict(tree(), 'docs/api/v1/rutas.md')).toBeNull()
   })
 })
 

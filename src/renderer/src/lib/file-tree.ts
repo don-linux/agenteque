@@ -236,6 +236,36 @@ export function siblingExistsExcept(
 }
 
 /**
+ * El alta con segmentos intermedios (`NOTAS/nueva.md`, `README.md/extra.md`)
+ * se rechaza entero si un tramo choca sin distinguir mayúsculas con un hermano,
+ * o si un fichero iba a convertirse en ancestro. Un padre que aún no existe
+ * deja libre el resto: no hay con quién chocar debajo.
+ */
+export function createPathConflict(nodes: TreeNode[], path: string): string | null {
+  const segments = path.split('/')
+  let level = nodes
+
+  for (let index = 0; index < segments.length; index += 1) {
+    const segment = segments[index] ?? ''
+    const isLast = index === segments.length - 1
+    const child = level.find((node) => sameEntryName(node.name, segment))
+    if (!child) return null
+
+    if (!isLast) {
+      if (child.kind !== 'dir' || child.name !== segment) {
+        return `\`${segment}\` ya existe`
+      }
+      level = child.children
+      continue
+    }
+
+    return `\`${segment}\` ya existe`
+  }
+
+  return null
+}
+
+/**
  * Cleans a rename typed in the tree. Unlike create, `/` is refused: this is
  * a same-folder rename, not a move. `\\` is allowed in the name.
  */
