@@ -20,6 +20,12 @@
     {
       "files": ["src/main/**", "src/preload/**", "tests/**", "*.config.ts", "*.config.js"],
       "env": { "node": true }
+    },
+    {
+      "files": ["tests/**"],
+      "rules": {
+        "vitest/valid-expect": ["error", { "maxArgs": 2 }]
+      }
     }
   ],
   "ignorePatterns": ["out/**", "dist/**"]
