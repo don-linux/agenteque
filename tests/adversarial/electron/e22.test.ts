@@ -86,7 +86,7 @@ function crashClass(reason: string | null): string | null {
   return reason
 }
 
-it.fails('ADV-E22 a second launch exits and the first window stays focused', async () => {
+it('ADV-E22 a second launch exits and the first window stays focused', async () => {
   const primary = await launchApp()
   if (!primary.window) throw new Error('primary window missing')
   await primary.window.locator('h1').waitFor()
@@ -287,7 +287,7 @@ it('quits when the last window closes, except on macOS', async () => {
   expect(windows).toBe(0)
 })
 
-it.fails('ADV-E22 a crashed renderer reloads in the same sandboxed window', async () => {
+it('ADV-E22 a crashed renderer reloads in the same sandboxed window', async () => {
   const launched = await launchApp()
   if (!launched.window) throw new Error('window missing')
   await launched.window.locator('h1').waitFor()

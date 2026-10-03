@@ -93,6 +93,7 @@ function createWindow(): BrowserWindow {
   })
 
   installNavigationGuard(win.webContents)
+  recoverRenderer(win)
 
   if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) {
     void win.loadURL(process.env.ELECTRON_RENDERER_URL)
@@ -101,6 +102,15 @@ function createWindow(): BrowserWindow {
   }
 
   return win
+}
+
+function recoverRenderer(win: BrowserWindow): void {
+  if (isSmokeTest) return
+  win.webContents.on('render-process-gone', (_event, details) => {
+    if (details.reason === 'clean-exit') return
+    if (win.isDestroyed()) return
+    void win.webContents.reload()
+  })
 }
 
 function isTrustedSender(frame: WebFrameMain | null): boolean {
@@ -244,16 +254,29 @@ function armSmokeTest(win: BrowserWindow): void {
   })
 }
 
-void app.whenReady().then(() => {
-  installSessionGuards()
-  registerIpcHandlers()
-  const win = createWindow()
-  if (isSmokeTest) armSmokeTest(win)
+const gotSingleInstanceLock = app.requestSingleInstanceLock()
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+if (!gotSingleInstanceLock) {
+  app.quit()
+} else {
+  app.on('second-instance', () => {
+    const win = BrowserWindow.getAllWindows()[0]
+    if (!win) return
+    if (win.isMinimized()) win.restore()
+    win.focus()
   })
-})
+
+  void app.whenReady().then(() => {
+    installSessionGuards()
+    registerIpcHandlers()
+    const win = createWindow()
+    if (isSmokeTest) armSmokeTest(win)
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    })
+  })
+}
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
