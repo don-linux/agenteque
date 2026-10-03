@@ -90,7 +90,7 @@ it('rejects a trailing newline', async () => {
   }
 })
 
-it.fails('ADV-G06 rejects a leading zero', async () => {
+it('ADV-G06 rejects a leading zero', async () => {
   for (const row of await tagExits(['v01.2.3', 'v1.02.3', 'v1.2.03'], bothLocales)) {
     expect(row.exitCode, row.where).toBe(1)
   }
@@ -104,7 +104,7 @@ it('rejects unicode digits in the C locale', async () => {
   }
 })
 
-it.fails('ADV-G06 rejects unicode digits', async () => {
+it('ADV-G06 rejects unicode digits', async () => {
   for (const row of await tagExits(unicodeDigitTags, ['en_US.UTF-8'])) {
     expect(row.exitCode, row.where).toBe(1)
   }
