@@ -22,7 +22,8 @@ linux:
     - target: tar.gz
       arch: [x64]
 mac:
-  identity: null
+  identity: '-'
+  hardenedRuntime: false
   artifactName: ${productName}-${version}-${arch}.${ext}
   target:
     - target: dmg
