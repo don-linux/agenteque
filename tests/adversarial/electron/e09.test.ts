@@ -162,7 +162,8 @@ it('a foreign iframe must not receive app:versions', async () => {
   expect(isVersionPayload(parent.versions), JSON.stringify(parent)).toBe(false)
 })
 
-// location.assign to a foreign origin is cancelled, so that document never receives app:versions.
+// location.assign to a foreign origin is cancelled, so that document never receives
+// app:versions. The versions handler also rejects an untrusted sender.
 it(
   'ADV-E09 a foreign origin must not receive app:versions after navigation',
   { meta: ADV_E09 },

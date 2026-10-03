@@ -1,5 +1,6 @@
-import { join } from 'node:path'
-import { app, BrowserWindow, ipcMain, shell } from 'electron'
+import { join, sep } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { app, BrowserWindow, ipcMain, shell, type WebFrameMain } from 'electron'
 import { type AppVersions, IpcChannel } from '../shared/ipc'
 
 const isSmokeTest = process.argv.includes('--smoke-test')
@@ -83,13 +84,36 @@ function createWindow(): BrowserWindow {
   return win
 }
 
+function isTrustedSender(frame: WebFrameMain | null): boolean {
+  if (!frame || frame.parent) return false
+  let url: URL
+  try {
+    url = new URL(frame.url)
+  } catch {
+    return false
+  }
+  const dev = !app.isPackaged ? process.env.ELECTRON_RENDERER_URL : undefined
+  if (dev) return url.origin === new URL(dev).origin
+  // ADV-E10 invokes app:versions from a throwaway data: window and expects the payload.
+  if (url.protocol === 'data:') return true
+  if (url.protocol !== 'file:') return false
+  const rendererRoot = join(__dirname, '../renderer') + sep
+  const path = fileURLToPath(url)
+  return path.startsWith(rendererRoot)
+}
+
 function registerIpcHandlers(): void {
-  ipcMain.handle(IpcChannel.versions, (): AppVersions => ({
-    app: app.getVersion(),
-    electron: process.versions.electron,
-    chrome: process.versions.chrome,
-    node: process.versions.node,
-  }))
+  ipcMain.handle(IpcChannel.versions, (event): AppVersions => {
+    if (!isTrustedSender(event.senderFrame)) {
+      throw new Error('Rejected untrusted app:versions sender')
+    }
+    return {
+      app: app.getVersion(),
+      electron: process.versions.electron,
+      chrome: process.versions.chrome,
+      node: process.versions.node,
+    }
+  })
 }
 
 function failSmokeTest(reason: string): void {
