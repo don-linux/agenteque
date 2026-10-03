@@ -82,7 +82,7 @@ jobs:
               files=(
                 "agenteque-0.0.1-amd64.deb"
                 "agenteque-0.0.1-x86_64.rpm"
-                "agenteque-0.0.1-x64.AppImage"
+                "agenteque-0.0.1-x86_64.AppImage"
                 "agenteque-0.0.1-x64.tar.gz"
               )
               ;;

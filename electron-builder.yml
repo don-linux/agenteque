@@ -10,6 +10,7 @@ publish: null
 linux:
   executableName: agenteque
   category: Development
+  maintainer: 'Fernando Diaz <don-linux@users.noreply.github.com>'
   artifactName: ${productName}-${version}-${arch}.${ext}
   target:
     - target: deb
