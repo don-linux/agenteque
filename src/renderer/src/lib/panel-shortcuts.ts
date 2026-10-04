@@ -19,6 +19,11 @@ interface Chord {
   altKey: boolean
 }
 
+/** Ctrl+G (Cmd+G en macOS). No llega mientras el foco está en la terminal. */
+export function isGitToggleShortcut(event: Chord): boolean {
+  return event.code === 'KeyG' && isPrimaryModifier(event) && !event.shiftKey && !event.altKey
+}
+
 /** Ctrl+T (Cmd+T en macOS). No llega mientras el foco está en la terminal. */
 export function isTreeToggleShortcut(event: Chord): boolean {
   return event.code === 'KeyT' && isPrimaryModifier(event) && !event.shiftKey && !event.altKey
@@ -49,6 +54,24 @@ export function handleTreeToggleShortcut(
   event.stopPropagation()
   event.stopImmediatePropagation?.()
   ctx.toggleTree()
+}
+
+export function handleGitToggleShortcut(
+  event: TreeToggleEvent,
+  ctx: {
+    hasWorkspace: boolean
+    insideTerminal: boolean
+    toggleGit: () => void
+  },
+): void {
+  if (!isGitToggleShortcut(event)) return
+  if (!ctx.hasWorkspace) return
+  if (ctx.insideTerminal) return
+
+  event.preventDefault()
+  event.stopPropagation()
+  event.stopImmediatePropagation?.()
+  ctx.toggleGit()
 }
 
 /**

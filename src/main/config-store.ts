@@ -1,10 +1,18 @@
 import { randomUUID } from 'node:crypto'
-import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { type AppConfig, defaultAppConfig, sanitizeConfig } from '../shared/config'
 
 const CONFIG_FILE = 'config.json'
 const MAX_CONFIG_BYTES = 1_000_000
+
+function directoryExists(path: string): boolean {
+  try {
+    return statSync(path).isDirectory()
+  } catch {
+    return false
+  }
+}
 
 /**
  * `config.json` en `userData`, no en `~/.agenteque`: la app se publica también
@@ -23,26 +31,35 @@ export class ConfigStore {
   load(): AppConfig {
     if (this.#cache) return this.#cache
 
+    const config = this.#read()
+    const recents = config.recents.map((entry) => ({
+      ...entry,
+      exists: directoryExists(entry.path),
+    }))
+    const changed = recents.some((entry, index) => entry.exists !== config.recents[index]?.exists)
+    const next = { ...config, recents }
+    if (!changed) {
+      this.#cache = next
+      return next
+    }
+    return this.save(next)
+  }
+
+  #read(): AppConfig {
     let raw: string
     try {
       raw = readFileSync(this.#file, 'utf8')
     } catch {
-      this.#cache = defaultAppConfig()
-      return this.#cache
+      return defaultAppConfig()
     }
 
-    if (raw.length > MAX_CONFIG_BYTES) {
-      this.#cache = defaultAppConfig()
-      return this.#cache
-    }
+    if (raw.length > MAX_CONFIG_BYTES) return defaultAppConfig()
 
     try {
-      this.#cache = sanitizeConfig(JSON.parse(raw))
+      return sanitizeConfig(JSON.parse(raw))
     } catch {
-      this.#cache = defaultAppConfig()
+      return defaultAppConfig()
     }
-
-    return this.#cache
   }
 
   /** Escritura atómica: fichero temporal en el mismo directorio y `rename`. */

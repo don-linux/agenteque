@@ -1,7 +1,6 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
   import { appConfig } from '$lib/app-config.svelte'
-  import FontCombobox from '$lib/components/FontCombobox.svelte'
+  import InstalledFonts from '$lib/components/InstalledFonts.svelte'
   import TerminalPreview from '$lib/components/TerminalPreview.svelte'
   import { shortcutLabel } from '$lib/platform'
   import { settingsEditor } from '$lib/settings-editor.svelte'
@@ -9,10 +8,11 @@
   import { resolveTerminalTheme, TERMINAL_ANSI_SLOTS, TERMINAL_THEMES } from '$lib/terminal-theme'
 
   let previewTheme = $derived(resolveTerminalTheme(settingsEditor.theme))
+  let fontsOpen = $state(false)
 
-  onMount(() => {
-    void appConfig.listSystemFonts()
-  })
+  function onFontInput(event: Event): void {
+    settingsEditor.setFont((event.currentTarget as HTMLInputElement).value)
+  }
 
   function onSizeChange(event: Event): void {
     const input = event.currentTarget as HTMLInputElement
@@ -36,16 +36,33 @@
 
   <div class="field">
     <label for="terminal-font">Fuente</label>
-    <FontCombobox
-      id="terminal-font"
-      fonts={appConfig.fonts}
-      value={settingsEditor.fontFamily}
-      disabled={!appConfig.fontsLoaded}
-      onSelect={(family) => settingsEditor.setFont(family)}
-    />
-    <p class="hint">
-      Lista curada de monoespaciadas. Si usas otra, escribe su nombre: el campo acepta texto libre.
-    </p>
+    <div class="font-row">
+      <input
+        id="terminal-font"
+        type="text"
+        autocomplete="off"
+        spellcheck="false"
+        placeholder="Predeterminada"
+        value={settingsEditor.fontFamily ?? ''}
+        oninput={onFontInput}
+      />
+      <button
+        type="button"
+        class={{ open: fontsOpen }}
+        aria-expanded={fontsOpen}
+        aria-controls="installed-fonts"
+        onclick={() => (fontsOpen = !fontsOpen)}
+      >
+        Fuentes instaladas
+      </button>
+    </div>
+    <p class="hint">Vacío usa la fuente predeterminada.</p>
+    {#if fontsOpen}
+      <InstalledFonts
+        selected={settingsEditor.fontFamily}
+        onPick={(family) => settingsEditor.setFont(family)}
+      />
+    {/if}
   </div>
 
   <div class="field">
@@ -152,6 +169,48 @@
     font-size: 0.78rem;
     font-weight: 600;
     letter-spacing: 0.02em;
+  }
+
+  .font-row {
+    display: flex;
+    align-items: stretch;
+    gap: 0.45rem;
+  }
+
+  .font-row input,
+  .font-row button {
+    box-sizing: border-box;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: 0.9rem;
+  }
+
+  .font-row input {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 0.5rem 0.7rem;
+  }
+
+  .font-row button {
+    flex: 0 0 auto;
+    padding: 0.5rem 0.75rem;
+    background: var(--surface-hover);
+    cursor: pointer;
+  }
+
+  .font-row input:focus,
+  .font-row button:focus-visible {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  .font-row button:hover,
+  .font-row button.open {
+    border-color: var(--accent);
+    color: var(--accent);
   }
 
   .stepper {

@@ -4,6 +4,12 @@ import { PREVIEW_PTY_ID } from '$lib/pty'
 
 export { PREVIEW_PTY_ID }
 
+let activeBackend: TerminalBackend = demoTerminal
+
+export function useTerminalBackend(backend: TerminalBackend): void {
+  activeBackend = backend
+}
+
 function messageFrom(error: unknown): string {
   if (typeof error === 'string') return error
   if (error instanceof Error) return error.message
@@ -19,7 +25,7 @@ export class TerminalPreviewSession {
   alive = false
   error: string | null = null
 
-  #backend: TerminalBackend = demoTerminal
+  #backend: TerminalBackend = activeBackend
   #spawning = false
   #gen = 0
   #onData: ((chunk: string) => void) | null = null

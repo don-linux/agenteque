@@ -4,6 +4,7 @@ import { demoWorkspace, DEMO_ROOT } from '$lib/backend/demo-workspace'
 import type { NodeKind, TreeNode, WorkspaceBackend, WorkspaceDirs } from '$lib/backend/types'
 import { browser } from '$lib/browser.svelte'
 import { editorSession } from '$lib/editor-session.svelte'
+import { gitGraph } from '$lib/git-graph.svelte'
 import { addTab, nextActiveAfterClose, removeTab } from '$lib/editor-tabs'
 import {
   baseNameOf,
@@ -89,6 +90,10 @@ class Workspace {
   pendingDelete = $state<DeleteRequest | null>(null)
 
   #backend: WorkspaceBackend = demoWorkspace
+
+  use(backend: WorkspaceBackend): void {
+    this.#backend = backend
+  }
   #drafts = new SvelteMap<string, string>()
   #contentFor = $state<string | null>(null)
   #writing: Promise<boolean> = Promise.resolve(true)
@@ -124,8 +129,14 @@ class Workspace {
     return this.#drafts.has(path)
   }
 
-  /** Sin diálogo nativo de carpeta: el botón abre el workspace de demostración. */
+  /** El diálogo nativo elige la carpeta. Sin puente, se queda la demo de los tests. */
   async openFolder(): Promise<void> {
+    if (typeof window !== 'undefined' && typeof window.api?.pickFolder === 'function') {
+      const picked = await window.api.pickFolder()
+      if (!picked) return
+      await this.openRoot(picked)
+      return
+    }
     await this.openRoot(DEMO_ROOT)
   }
 
@@ -176,6 +187,7 @@ class Workspace {
     if (recorded) {
       this.root = recorded
     }
+    void gitGraph.setRoot(this.root)
 
     if (shouldShowFolderVisibilityToast(listed.dirs.length > 0, includeDirs ?? undefined)) {
       toasts.hint(FOLDER_VISIBILITY_TOAST)
@@ -188,6 +200,7 @@ class Workspace {
     await this.#leaveSession()
 
     this.root = null
+    void gitGraph.setRoot(null)
     this.tree = []
     this.childDirs = []
     this.visibleFolders = null

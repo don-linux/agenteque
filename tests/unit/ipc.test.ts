@@ -5,7 +5,8 @@ describe('IpcChannel', () => {
   it('uses unique, namespaced channel names', () => {
     const channels = Object.values(IpcChannel)
     expect(new Set(channels).size).toBe(channels.length)
-    for (const channel of channels) expect(channel).toMatch(/^(app|config):[a-zA-Z-]+$/)
+    for (const channel of channels)
+      expect(channel).toMatch(/^(app|config|shell|pty|fs|git):[a-zA-Z-]+$/)
   })
 
   it('keeps one channel per configuration command', () => {

@@ -358,8 +358,9 @@ describe('folderNameOf', () => {
     expect(folderNameOf('/home/fernando/carpeta///')).toBe('carpeta')
   })
 
-  it('does not treat a backslash as a path separator', () => {
-    expect(folderNameOf('C:\\Users\\fernando\\notas')).toBe('C:\\Users\\fernando\\notas')
+  it('uses the last segment of a Windows path', () => {
+    expect(folderNameOf('C:\\Users\\fernando\\notas')).toBe('notas')
+    expect(folderNameOf('C:\\Users\\fernando\\notas\\')).toBe('notas')
   })
 
   it('falls back to the path itself at a filesystem root', () => {

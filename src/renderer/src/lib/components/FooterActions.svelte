@@ -1,5 +1,6 @@
 <script lang="ts">
   import Folder from '@lucide/svelte/icons/folder'
+  import GitBranch from '@lucide/svelte/icons/git-branch'
   import Globe from '@lucide/svelte/icons/globe'
   import House from '@lucide/svelte/icons/house'
   import Settings from '@lucide/svelte/icons/settings'
@@ -11,6 +12,8 @@
     runFooterAction,
     type FooterActionId,
   } from '$lib/footer-actions'
+  import { gitFooter } from '$lib/git-footer.svelte'
+  import { gitFooterButtonTitle } from '$lib/git-footer'
   import { shortcutLabel } from '$lib/platform'
   import { router } from '$lib/router.svelte'
   import { dockFromAlt } from '$lib/terminal-dock'
@@ -25,9 +28,10 @@
     settings: 'Configuración',
     terminal: 'Terminal',
     browser: 'Navegador',
+    git: 'Git',
   }
 
-  const titles: Record<FooterActionId, string> = {
+  const titles: Record<Exclude<FooterActionId, 'git'>, string> = {
     home: 'Inicio',
     folder: 'Cambiar carpeta',
     settings: 'Configuración',
@@ -38,6 +42,13 @@
       'Ctrl+Shift+B',
     )}`,
   }
+
+  const gitShortcut = shortcutLabel('Ctrl+G')
+  let gitTitle = $derived(gitFooterButtonTitle(gitFooter.state, gitShortcut))
+
+  $effect(() => {
+    void gitFooter.setRoot(workspace.root)
+  })
 
   function onActionClick(id: FooterActionId, event: MouseEvent): void {
     runFooterAction(id, {
@@ -54,6 +65,10 @@
       },
       browser: () => {
         browser.toggle()
+      },
+      git: () => {
+        panels.toggleGit()
+        void gitFooter.refresh()
       },
     })
   }
@@ -80,16 +95,19 @@
             {
               active:
                 (id === 'terminal' && (terminal.open || terminal.surface === 'terminals')) ||
-                (id === 'browser' && surface.current === 'browser'),
+                (id === 'browser' && surface.current === 'browser') ||
+                (id === 'git' && panels.gitVisible),
             },
           ]}
           aria-pressed={id === 'terminal'
             ? terminal.open || terminal.surface === 'terminals'
             : id === 'browser'
               ? surface.current === 'browser'
-              : undefined}
+              : id === 'git'
+                ? panels.gitVisible
+                : undefined}
           aria-label={labels[id]}
-          title={titles[id]}
+          title={id === 'git' ? gitTitle : titles[id]}
           onclick={(event) => onActionClick(id, event)}
         >
           {#if id === 'home'}
@@ -98,6 +116,8 @@
             <Folder size={16} strokeWidth={1.75} aria-hidden="true" />
           {:else if id === 'browser'}
             <Globe size={16} strokeWidth={1.75} aria-hidden="true" />
+          {:else if id === 'git'}
+            <GitBranch size={16} strokeWidth={1.75} aria-hidden="true" />
           {:else}
             <SquareTerminal size={16} strokeWidth={1.75} aria-hidden="true" />
           {/if}

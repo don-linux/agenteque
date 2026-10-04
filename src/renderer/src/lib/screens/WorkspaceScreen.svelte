@@ -9,10 +9,15 @@
   import FileTreePanel from '$lib/components/FileTreePanel.svelte'
   import FooterActions from '$lib/components/FooterActions.svelte'
   import FooterTransient from '$lib/components/FooterTransient.svelte'
+  import GitGraphPanel from '$lib/components/GitGraphPanel.svelte'
   import PanelSplitter from '$lib/components/PanelSplitter.svelte'
   import TerminalHost from '$lib/components/TerminalHost.svelte'
   import { FOLDER_VISIBILITY_LABEL } from '$lib/folder-visibility'
-  import { handleTreeToggleShortcut, isTerminalTarget } from '$lib/panel-shortcuts'
+  import {
+    handleGitToggleShortcut,
+    handleTreeToggleShortcut,
+    isTerminalTarget,
+  } from '$lib/panel-shortcuts'
   import { shortcutLabel } from '$lib/platform'
   import { handleSaveShortcut } from '$lib/save-shortcut'
   import { handleTerminalShortcut, handleTerminalSurfaceShortcut } from '$lib/terminal-dock'
@@ -74,6 +79,11 @@
       insideTerminal: isTerminalTarget(event.target),
       toggleTree: () => panels.toggleTree(),
     })
+    handleGitToggleShortcut(event, {
+      hasWorkspace: workspace.root !== null,
+      insideTerminal: isTerminalTarget(event.target),
+      toggleGit: () => panels.toggleGit(),
+    })
   }
 </script>
 
@@ -97,7 +107,11 @@
       style:--park-height="{terminal.parkHeight}px"
     >
       {#if showTree}
-        <FileTreePanel parked={parkedChrome} />
+        {#if panels.gitVisible}
+          <GitGraphPanel parked={parkedChrome} />
+        {:else}
+          <FileTreePanel parked={parkedChrome} />
+        {/if}
         {#if !parkedChrome}
           <div class="sash">
             <PanelSplitter

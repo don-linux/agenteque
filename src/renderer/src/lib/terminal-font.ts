@@ -10,10 +10,9 @@ export const MIN_TERMINAL_FONT_SIZE = 10
 export const MAX_TERMINAL_FONT_SIZE = 24
 export const DEFAULT_FONT_LABEL = 'Predeterminada'
 
-export interface SystemFont {
-  family: string
-  monospace: boolean
-}
+import type { SystemFont } from '../../../shared/fonts'
+
+export type { SystemFont }
 
 export function xtermFontFamily(name: string | null | undefined): string {
   const trimmed = name?.trim()

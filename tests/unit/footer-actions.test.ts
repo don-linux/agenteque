@@ -13,6 +13,7 @@ describe('DEFAULT_FOOTER_ACTION_ORDER', () => {
       'settings',
       'terminal',
       'browser',
+      'git',
     ])
   })
 })
@@ -24,6 +25,7 @@ describe('footerActionIntent', () => {
     expect(footerActionIntent('settings')).toBe('settings')
     expect(footerActionIntent('terminal')).toBe('terminal')
     expect(footerActionIntent('browser')).toBe('browser')
+    expect(footerActionIntent('git')).toBe('git')
     expect(footerActionIntent('browser')).not.toBe('idle')
     expect(footerActionIntent('browser')).not.toBe('terminal')
   })
@@ -35,6 +37,7 @@ describe('footerActionIntent', () => {
       folder: () => calls.push('folder'),
       terminal: () => calls.push('terminal'),
       browser: () => calls.push('browser'),
+      git: () => calls.push('git'),
     }
 
     runFooterAction('home', actions)
@@ -58,6 +61,9 @@ describe('footerActionIntent', () => {
         throw new Error('terminal')
       },
       browser: (): void => undefined,
+      git: (): void => {
+        throw new Error('git')
+      },
     }
 
     expect(() => runFooterAction('browser', actions)).not.toThrow()
@@ -76,6 +82,9 @@ describe('footerActionIntent', () => {
       },
       browser: (): void => {
         throw new Error('browser')
+      },
+      git: (): void => {
+        throw new Error('git')
       },
     }
 

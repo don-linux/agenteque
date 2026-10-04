@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, unlinkSync } from 'node:fs'
 import { join, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { app, BrowserWindow, ipcMain, session, shell, type WebFrameMain } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, session, shell, type WebFrameMain } from 'electron'
 import {
   type AppConfig,
   type AppearanceSettings,
@@ -12,8 +12,31 @@ import {
   withWorkspaceView,
   type WorkspaceView,
 } from '../shared/config'
-import { type AppVersions, IpcChannel } from '../shared/ipc'
+import { type AppVersions, type EntryRequest, type MoveRequest, IpcChannel } from '../shared/ipc'
 import { ConfigStore } from './config-store'
+import { readFontPage } from './font-catalog'
+import { readGitGraph, readGitRefs, readGitSummary } from './git-host'
+import {
+  currentShell,
+  ptyKill,
+  ptyKillAll,
+  ptyKillEvery,
+  ptyResize,
+  ptySpawn,
+  ptyWrite,
+} from './pty-host'
+import {
+  createEntry,
+  deleteEntry,
+  listContextTree,
+  listWorkspaceDirs,
+  moveEntry,
+  readMarkdown,
+  renameEntry,
+  stopWatching,
+  watchWorkspace,
+  writeMarkdown,
+} from './workspace-fs'
 
 const isSmokeTest = process.argv.includes('--smoke-test')
 const SMOKE_TIMEOUT_MS = 20_000
@@ -219,6 +242,7 @@ function registerIpcHandlers(): void {
   })
 
   registerConfigHandlers(new ConfigStore(app.getPath('userData')))
+  registerNativeHandlers()
 }
 
 function handleConfig(channel: string, run: (payload: unknown) => AppConfig): void {
@@ -254,6 +278,216 @@ function registerConfigHandlers(store: ConfigStore): void {
   handleConfig(IpcChannel.configRemoveRecent, (payload) =>
     store.update((config) => withoutRecent(config, String(payload ?? ''))),
   )
+}
+
+function trusted(event: Electron.IpcMainInvokeEvent, channel: string): void {
+  if (!isTrustedSender(event.senderFrame)) {
+    throw new Error(`Rejected untrusted ${channel} sender`)
+  }
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object') return null
+  return value as Record<string, unknown>
+}
+
+function asKind(value: unknown): 'dir' | 'file' {
+  if (value !== 'dir' && value !== 'file') throw new Error('Tipo de entrada inválido')
+  return value
+}
+
+function asStringList(value: unknown): string[] {
+  if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) {
+    throw new Error('Lista inválida')
+  }
+  return value
+}
+
+function registerNativeHandlers(): void {
+  ipcMain.handle(IpcChannel.shellStatus, (event) => {
+    trusted(event, IpcChannel.shellStatus)
+    return { available: currentShell() !== null }
+  })
+
+  ipcMain.handle(IpcChannel.ptySpawn, (event, payload: unknown) => {
+    trusted(event, IpcChannel.ptySpawn)
+    const row = asRecord(payload)
+    if (!row || typeof row.id !== 'string' || typeof row.cwd !== 'string') {
+      throw new Error('Petición de terminal inválida')
+    }
+    const cols = Number(row.cols)
+    const rows = Number(row.rows)
+    if (!Number.isFinite(cols) || !Number.isFinite(rows))
+      throw new Error('Tamaño de terminal inválido')
+    const id = row.id
+    ptySpawn(
+      { id, cwd: row.cwd, cols, rows },
+      (data) => {
+        if (!event.sender.isDestroyed()) event.sender.send(IpcChannel.ptyData, { id, data })
+      },
+      (code) => {
+        if (!event.sender.isDestroyed()) event.sender.send(IpcChannel.ptyExit, { id, code })
+      },
+    )
+  })
+
+  ipcMain.handle(IpcChannel.ptyWrite, (event, id: unknown, data: unknown) => {
+    trusted(event, IpcChannel.ptyWrite)
+    if (typeof id !== 'string' || typeof data !== 'string') throw new Error('Escritura inválida')
+    ptyWrite(id, data)
+  })
+
+  ipcMain.handle(IpcChannel.ptyResize, (event, id: unknown, cols: unknown, rows: unknown) => {
+    trusted(event, IpcChannel.ptyResize)
+    if (typeof id !== 'string' || typeof cols !== 'number' || typeof rows !== 'number') {
+      throw new Error('Tamaño de terminal inválido')
+    }
+    ptyResize(id, cols, rows)
+  })
+
+  ipcMain.handle(IpcChannel.ptyKill, (event, id: unknown) => {
+    trusted(event, IpcChannel.ptyKill)
+    if (typeof id !== 'string') throw new Error('Falta el id de la terminal')
+    ptyKill(id)
+  })
+
+  ipcMain.handle(IpcChannel.ptyKillAll, (event) => {
+    trusted(event, IpcChannel.ptyKillAll)
+    ptyKillAll()
+  })
+
+  ipcMain.handle(IpcChannel.pickFolder, async (event) => {
+    trusted(event, IpcChannel.pickFolder)
+    const parent = BrowserWindow.fromWebContents(event.sender)
+    const result = parent
+      ? await dialog.showOpenDialog(parent, { properties: ['openDirectory'] })
+      : await dialog.showOpenDialog({ properties: ['openDirectory'] })
+    if (result.canceled) return null
+    return result.filePaths[0] ?? null
+  })
+
+  ipcMain.handle(IpcChannel.listWorkspaceDirs, (event, root: unknown) => {
+    trusted(event, IpcChannel.listWorkspaceDirs)
+    if (typeof root !== 'string') throw new Error('Falta la carpeta')
+    const listed = listWorkspaceDirs(root)
+    watchWorkspace(listed.root, (changed) => {
+      if (!event.sender.isDestroyed()) event.sender.send(IpcChannel.workspaceChanged, changed)
+    })
+    return listed
+  })
+
+  ipcMain.handle(IpcChannel.listContextTree, (event, root: unknown, include: unknown) => {
+    trusted(event, IpcChannel.listContextTree)
+    if (typeof root !== 'string') throw new Error('Falta la carpeta')
+    const includeDirs = include === null ? null : asStringList(include)
+    return listContextTree(root, includeDirs)
+  })
+
+  ipcMain.handle(IpcChannel.readMarkdown, (event, root: unknown, path: unknown) => {
+    trusted(event, IpcChannel.readMarkdown)
+    if (typeof root !== 'string' || typeof path !== 'string') throw new Error('Ruta inválida')
+    return readMarkdown(root, path)
+  })
+
+  ipcMain.handle(
+    IpcChannel.writeMarkdown,
+    (event, root: unknown, path: unknown, contents: unknown) => {
+      trusted(event, IpcChannel.writeMarkdown)
+      if (typeof root !== 'string' || typeof path !== 'string' || typeof contents !== 'string') {
+        throw new Error('Ruta inválida')
+      }
+      writeMarkdown(root, path, contents)
+    },
+  )
+
+  ipcMain.handle(IpcChannel.createEntry, (event, payload: unknown) => {
+    trusted(event, IpcChannel.createEntry)
+    const row = asRecord(payload) as Partial<EntryRequest> | null
+    if (!row || typeof row.root !== 'string' || typeof row.path !== 'string') {
+      throw new Error('Ruta inválida')
+    }
+    createEntry(row.root, row.path, asKind(row.kind))
+  })
+
+  ipcMain.handle(IpcChannel.renameEntry, (event, payload: unknown) => {
+    trusted(event, IpcChannel.renameEntry)
+    const row = asRecord(payload) as Partial<MoveRequest> | null
+    if (
+      !row ||
+      typeof row.root !== 'string' ||
+      typeof row.from !== 'string' ||
+      typeof row.to !== 'string'
+    ) {
+      throw new Error('Ruta inválida')
+    }
+    renameEntry(row.root, row.from, row.to, asKind(row.kind))
+  })
+
+  ipcMain.handle(IpcChannel.moveEntry, (event, payload: unknown) => {
+    trusted(event, IpcChannel.moveEntry)
+    const row = asRecord(payload) as Partial<MoveRequest> | null
+    if (
+      !row ||
+      typeof row.root !== 'string' ||
+      typeof row.from !== 'string' ||
+      typeof row.to !== 'string'
+    ) {
+      throw new Error('Ruta inválida')
+    }
+    moveEntry(row.root, row.from, row.to, asKind(row.kind))
+  })
+
+  ipcMain.handle(IpcChannel.deleteEntry, (event, payload: unknown) => {
+    trusted(event, IpcChannel.deleteEntry)
+    const row = asRecord(payload) as Partial<EntryRequest> | null
+    if (!row || typeof row.root !== 'string' || typeof row.path !== 'string') {
+      throw new Error('Ruta inválida')
+    }
+    deleteEntry(row.root, row.path, asKind(row.kind))
+  })
+
+  ipcMain.handle(IpcChannel.gitRefs, async (event, root: unknown) => {
+    trusted(event, IpcChannel.gitRefs)
+    if (typeof root !== 'string') throw new Error('Falta la carpeta')
+    try {
+      return await readGitRefs(root)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Git no responde'
+      return { probe: { available: false }, error: message }
+    }
+  })
+
+  ipcMain.handle(IpcChannel.gitGraph, async (event, root: unknown, selected: unknown) => {
+    trusted(event, IpcChannel.gitGraph)
+    if (typeof root !== 'string') throw new Error('Falta la carpeta')
+    try {
+      return await readGitGraph(root, asStringList(Array.isArray(selected) ? selected : []))
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Git no responde'
+      return { probe: { available: false }, error: message }
+    }
+  })
+
+  ipcMain.handle(IpcChannel.gitSummary, async (event, root: unknown) => {
+    trusted(event, IpcChannel.gitSummary)
+    if (typeof root !== 'string') throw new Error('Falta la carpeta')
+    try {
+      return await readGitSummary(root)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Git no responde'
+      return { probe: { available: false }, error: message }
+    }
+  })
+
+  ipcMain.handle(IpcChannel.fontPage, (event, payload: unknown) => {
+    trusted(event, IpcChannel.fontPage)
+    const row = asRecord(payload)
+    if (!row) throw new Error('Solicitud inválida')
+    const query = typeof row.query === 'string' ? row.query : ''
+    const offset = typeof row.offset === 'number' ? row.offset : 0
+    const limit = typeof row.limit === 'number' ? row.limit : 40
+    return readFontPage(query, offset, limit)
+  })
 }
 
 /**
@@ -355,5 +589,7 @@ if (!gotSingleInstanceLock) {
 }
 
 app.on('window-all-closed', () => {
+  ptyKillEvery()
+  stopWatching()
   if (process.platform !== 'darwin') app.quit()
 })
