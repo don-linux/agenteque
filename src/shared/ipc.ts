@@ -1,6 +1,9 @@
+import type { BrowserBounds, BrowserShortcutName } from './browser'
 import type {
   AppConfig,
   AppearanceSettings,
+  BrowserSettings,
+  DevtoolsDock,
   LayoutSettings,
   TerminalSettings,
   WorkspaceView,
@@ -16,8 +19,20 @@ export const IpcChannel = {
   configSaveAppearance: 'config:saveAppearance',
   configSaveLayout: 'config:saveLayout',
   configSaveWorkspaceView: 'config:saveWorkspaceView',
+  configSaveBrowser: 'config:saveBrowser',
   configRecordRecent: 'config:recordRecent',
   configRemoveRecent: 'config:removeRecent',
+  browserSpawn: 'browser:spawn',
+  browserNewTab: 'browser:new-tab',
+  browserCommand: 'browser:command',
+  browserBounds: 'browser:bounds',
+  browserFocusApp: 'browser:focus-app',
+  browserFocusPage: 'browser:focus-page',
+  browserKill: 'browser:kill',
+  browserState: 'browser:state',
+  browserShortcut: 'browser:shortcut',
+  browserFocus: 'browser:focus',
+  browserTabOpened: 'browser:tab-opened',
   shellStatus: 'shell:status',
   ptySpawn: 'pty:spawn',
   ptyWrite: 'pty:write',
@@ -132,6 +147,39 @@ export interface FontPageResult {
   error?: string
 }
 
+export type BrowserTabError =
+  | { kind: 'crash'; status: string }
+  | { kind: 'load'; description: string }
+
+export interface BrowserTabState {
+  id: string
+  url: string
+  title: string
+  loading: boolean
+  canGoBack: boolean
+  canGoForward: boolean
+  error: BrowserTabError | null
+}
+
+export interface BrowserBoot {
+  chromium: string
+  tab: BrowserTabState
+}
+
+export type BrowserDevtoolsAction = 'toggle' | 'set'
+
+export type BrowserCommand =
+  | { cmd: 'navigate'; tabId: string; url: string }
+  | { cmd: 'back'; tabId: string }
+  | { cmd: 'forward'; tabId: string }
+  | { cmd: 'stop'; tabId: string }
+  | { cmd: 'reload'; tabId: string; ignoreCache: boolean }
+  | { cmd: 'devtools'; tabId: string; mode: DevtoolsDock; action: BrowserDevtoolsAction }
+  | { cmd: 'close-tab'; tabId: string }
+  | { cmd: 'select-tab'; tabId: string }
+
+export type { BrowserBounds, BrowserShortcutName }
+
 /**
  * Cada comando de configuración devuelve el `AppConfig` completo, igual que
  * hacía el backend Rust: el renderer nunca compone el estado a trozos.
@@ -145,6 +193,7 @@ export interface AgentequeApi {
   saveAppearanceSettings(appearance: AppearanceSettings): Promise<AppConfig>
   saveLayoutSettings(layout: LayoutSettings): Promise<AppConfig>
   saveWorkspaceView(view: WorkspaceView): Promise<AppConfig>
+  saveBrowserSettings(browser: BrowserSettings): Promise<AppConfig>
   recordRecentFolder(path: string): Promise<AppConfig>
   removeRecentFolder(path: string): Promise<AppConfig>
   shellStatus(): Promise<ShellStatus>
@@ -169,4 +218,15 @@ export interface AgentequeApi {
   gitGraph(root: string, selected: string[]): Promise<GitGraphResult>
   gitSummary(root: string): Promise<GitSummaryResult>
   fontPage(request: FontPageRequest): Promise<FontPageResult>
+  browserSpawn(url: string): Promise<BrowserBoot>
+  browserNewTab(url: string): Promise<BrowserTabState>
+  browserCommand(command: BrowserCommand): Promise<void>
+  browserSetBounds(bounds: BrowserBounds): void
+  browserFocusApp(): Promise<void>
+  browserFocusPage(): Promise<void>
+  browserKill(): Promise<void>
+  onBrowserState(listener: (tab: BrowserTabState) => void): () => void
+  onBrowserShortcut(listener: (name: BrowserShortcutName) => void): () => void
+  onBrowserFocus(listener: () => void): () => void
+  onBrowserTabOpened(listener: (tab: BrowserTabState) => void): () => void
 }

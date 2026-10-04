@@ -53,21 +53,35 @@ export interface TerminalBackend {
   killAll(): Promise<void>
 }
 
-export type BrowserCommand =
-  | { cmd: 'navigate'; url: string }
-  | { cmd: 'back' }
-  | { cmd: 'forward' }
-  | { cmd: 'stop' }
-  | { cmd: 'reload'; ignoreCache: boolean }
-  | { cmd: 'devtools' }
+export type {
+  BrowserBoot,
+  BrowserBounds,
+  BrowserCommand,
+  BrowserTabState,
+} from '../../../../shared/ipc'
 
-export interface BrowserBoot {
-  chromium: string
+import type {
+  BrowserBoot,
+  BrowserBounds,
+  BrowserCommand,
+  BrowserTabState,
+} from '../../../../shared/ipc'
+import type { BrowserShortcutName } from '../../../../shared/browser'
+
+export interface BrowserListener {
+  state: (tab: BrowserTabState) => void
+  shortcut: (name: BrowserShortcutName) => void
+  focus: () => void
+  tabOpened: (tab: BrowserTabState) => void
 }
 
 export interface BrowserBackend {
   spawn(url: string): Promise<BrowserBoot>
-  navigate(url: string): Promise<void>
+  newTab(url: string): Promise<BrowserTabState>
   command(command: BrowserCommand): Promise<void>
+  bounds(bounds: BrowserBounds): void
+  focusApp(): Promise<void>
+  focusPage(): Promise<void>
   kill(): Promise<void>
+  subscribe(listener: BrowserListener): () => void
 }

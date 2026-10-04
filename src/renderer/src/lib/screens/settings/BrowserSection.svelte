@@ -2,7 +2,6 @@
   import { onMount } from 'svelte'
   import {
     acceptVersions,
-    BROWSER_UNAVAILABLE,
     COPY,
     runtimeLines,
     VERSIONS_UNAVAILABLE,
@@ -52,8 +51,6 @@
   {:else}
     <p class="hint">{COPY.loading}</p>
   {/if}
-
-  <p class="hint">{BROWSER_UNAVAILABLE}.</p>
 </section>
 
 <style>

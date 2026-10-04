@@ -4,18 +4,36 @@
   import Code from '@lucide/svelte/icons/code'
   import RotateCw from '@lucide/svelte/icons/rotate-cw'
   import X from '@lucide/svelte/icons/x'
-  import { displayUrl } from '$lib/browser-url'
+  import { appConfig } from '$lib/app-config.svelte'
   import {
     browser,
+    isUrlBarElement,
     shouldApplyFocusUrlRequest,
     shouldHandleToolbarFocusIn,
   } from '$lib/browser.svelte'
-  import { shortcutLabel } from '$lib/platform'
+  import { toolbarReloadClick } from '$lib/browser-tabs'
+  import BrowserMenu from '$lib/components/BrowserMenu.svelte'
   import { surface } from '$lib/workspace-surface.svelte'
+  import type { BrowserReload, DevtoolsDock } from '../../../../shared/config'
 
-  const closeLabel = `Cerrar navegador (${shortcutLabel('Ctrl+B')})`
+  const DEVTOOLS_ITEMS = [
+    { id: 'right', label: 'Derecha' },
+    { id: 'left', label: 'Izquierda' },
+    { id: 'bottom', label: 'Abajo' },
+    { id: 'undocked', label: 'Ventana separada' },
+  ] as const
+
+  const RELOAD_ITEMS = [
+    { id: 'normal', label: 'Recargar' },
+    { id: 'nocache', label: 'Recargar sin caché' },
+  ] as const
 
   let lastFocusUrlRequest = 0
+
+  let reloadTitle = $derived(
+    appConfig.browserReload === 'nocache' ? 'Recargar sin caché' : 'Recargar',
+  )
+  let menu = $derived(browser.visible ? browser.menu : null)
 
   function attachUrl(node: HTMLInputElement): void {
     $effect(() => {
@@ -28,10 +46,21 @@
     })
   }
 
-  // Un blur por clic en la página no debe parecer un clic en la barra:
-  // `pointerdown` es el gesto que sí puede reclamar el teclado.
   function onToolbarPointerDown(): void {
     browser.toolbarClaimBlocked = false
+    browser.claimChromeKeyboard()
+  }
+
+  function onUrlPointerDown(event: PointerEvent): void {
+    const active = document.activeElement
+    const alreadyEditing =
+      browser.focusOwner === 'app' && isUrlBarElement(active) && active === event.currentTarget
+    if (alreadyEditing) {
+      browser.toolbarClaimBlocked = false
+      return
+    }
+    event.preventDefault()
+    void browser.claimUrlBar(true)
   }
 
   function onToolbarFocusIn(): void {
@@ -51,13 +80,46 @@
     }
     if (event.key === 'Escape') {
       event.preventDefault()
-      browser.inputUrl = displayUrl(browser.url)
+      browser.finishUrlEdit()
       input.blur()
     }
   }
+
+  function openMenu(event: MouseEvent, kind: 'reload' | 'devtools'): void {
+    event.preventDefault()
+    browser.openChromeMenu(kind, event.clientX, event.clientY)
+  }
+
+  function onReloadClick(): void {
+    if (!browser.alive) return
+    const action = toolbarReloadClick(browser.loading, appConfig.browserReload)
+    if (action.cmd === 'stop') {
+      void browser.stop()
+      return
+    }
+    void browser.reload(action.ignoreCache)
+  }
+
+  function pickMenu(id: string): void {
+    const kind = browser.menu?.kind
+    browser.closeChromeMenu()
+    if (kind === 'reload') {
+      void browser.chooseReload(id as BrowserReload)
+      return
+    }
+    if (kind === 'devtools') void browser.chooseDevtools(id as DevtoolsDock)
+  }
 </script>
 
-<div class="toolbar" data-browser-toolbar onfocusin={onToolbarFocusIn}>
+<div
+  class="toolbar"
+  data-browser-toolbar
+  role="toolbar"
+  aria-label="Navegación"
+  tabindex="-1"
+  onpointerdown={onToolbarPointerDown}
+  onfocusin={onToolbarFocusIn}
+>
   <div class="row">
     <button
       type="button"
@@ -79,29 +141,22 @@
     >
       <ArrowRight size={16} strokeWidth={1.75} aria-hidden="true" />
     </button>
-    {#if browser.loading}
-      <button
-        type="button"
-        class="action"
-        aria-label="Detener"
-        title="Detener"
-        disabled={!browser.alive}
-        onclick={() => void browser.stop()}
-      >
+    <button
+      type="button"
+      class="action"
+      aria-label={browser.loading ? 'Detener' : reloadTitle}
+      title={browser.loading ? 'Detener' : reloadTitle}
+      data-browser-reload
+      disabled={!browser.alive}
+      onclick={onReloadClick}
+      oncontextmenu={(event) => openMenu(event, 'reload')}
+    >
+      {#if browser.loading}
         <X size={16} strokeWidth={1.75} aria-hidden="true" />
-      </button>
-    {:else}
-      <button
-        type="button"
-        class="action"
-        aria-label="Recargar"
-        title="Recargar"
-        disabled={!browser.alive}
-        onclick={() => void browser.reload()}
-      >
+      {:else}
         <RotateCw size={16} strokeWidth={1.75} aria-hidden="true" />
-      </button>
-    {/if}
+      {/if}
+    </button>
     <input
       class="url"
       type="text"
@@ -112,7 +167,11 @@
       data-browser-url
       bind:value={browser.inputUrl}
       {@attach attachUrl}
-      onpointerdown={onToolbarPointerDown}
+      onpointerdown={onUrlPointerDown}
+      onfocus={() => {
+        browser.editingUrl = true
+      }}
+      onblur={() => browser.finishUrlEdit()}
       onkeydown={onUrlKeydown}
     />
     <button
@@ -120,18 +179,20 @@
       class="action"
       aria-label="DevTools (F12)"
       title="DevTools (F12)"
+      data-browser-devtools
       disabled={!browser.alive}
       onclick={() => void browser.devtools()}
+      oncontextmenu={(event) => openMenu(event, 'devtools')}
     >
       <Code size={16} strokeWidth={1.75} aria-hidden="true" />
     </button>
     <button
       type="button"
       class="action"
-      aria-label={closeLabel}
-      title={closeLabel}
+      aria-label="Cerrar navegador"
+      title="Cerrar navegador"
       data-browser-chrome-last
-      onclick={() => browser.leave()}
+      onclick={() => browser.requestClose()}
     >
       <X size={16} strokeWidth={1.75} aria-hidden="true" />
     </button>
@@ -143,6 +204,18 @@
     </div>
   {/if}
 </div>
+
+{#if menu && browser.visible}
+  <BrowserMenu
+    x={menu.x}
+    y={menu.y}
+    label={menu.kind === 'devtools' ? 'Ubicación de DevTools' : 'Modo de recarga'}
+    items={menu.kind === 'devtools' ? DEVTOOLS_ITEMS : RELOAD_ITEMS}
+    current={menu.kind === 'devtools' ? appConfig.browserDevtoolsDock : appConfig.browserReload}
+    onPick={pickMenu}
+    onClose={() => browser.closeChromeMenu()}
+  />
+{/if}
 
 <style>
   .toolbar {

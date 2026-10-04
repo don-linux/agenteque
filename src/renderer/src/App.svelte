@@ -2,8 +2,11 @@
   import { onMount } from 'svelte'
   import { appConfig } from '$lib/app-config.svelte'
   import { ROUTES } from '$lib/app-routes'
+  import { browserIpc } from '$lib/backend/browser-ipc'
   import { workspaceIpc } from '$lib/backend/workspace-ipc'
   import { terminalIpc } from '$lib/backend/terminal-ipc'
+  import { browser } from '$lib/browser.svelte'
+  import BrowserCloseModal from '$lib/components/BrowserCloseModal.svelte'
   import DeleteEntryModal from '$lib/components/DeleteEntryModal.svelte'
   import FolderVisibilityModal from '$lib/components/FolderVisibilityModal.svelte'
   import ToastHost from '$lib/components/ToastHost.svelte'
@@ -39,6 +42,7 @@
     if (typeof window.api.ptySpawn === 'function') {
       workspace.use(workspaceIpc)
       terminal.use(terminalIpc)
+      browser.use(browserIpc)
       useTerminalBackend(terminalIpc)
       void shellStatus.load()
       window.api.onWorkspaceChanged((root) => {
@@ -65,6 +69,7 @@
 <UnsavedExitModal />
 <FolderVisibilityModal />
 <DeleteEntryModal />
+<BrowserCloseModal />
 <ToastHost />
 
 <style>

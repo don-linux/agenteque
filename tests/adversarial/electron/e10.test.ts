@@ -19,6 +19,7 @@ const BRIDGE_KEYS = [
   'saveAppearanceSettings',
   'saveLayoutSettings',
   'saveWorkspaceView',
+  'saveBrowserSettings',
   'recordRecentFolder',
   'removeRecentFolder',
   'shellStatus',
@@ -43,6 +44,17 @@ const BRIDGE_KEYS = [
   'gitGraph',
   'gitSummary',
   'fontPage',
+  'browserSpawn',
+  'browserNewTab',
+  'browserCommand',
+  'browserSetBounds',
+  'browserFocusApp',
+  'browserFocusPage',
+  'browserKill',
+  'onBrowserState',
+  'onBrowserShortcut',
+  'onBrowserFocus',
+  'onBrowserTabOpened',
 ] as readonly string[]
 
 const SENTINEL = 'ADV-E10-SENTINEL'

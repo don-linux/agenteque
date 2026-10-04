@@ -8,21 +8,56 @@
 
 <script lang="ts">
   import { browser } from '$lib/browser.svelte'
+  import BrowserTabs from '$lib/components/BrowserTabs.svelte'
   import BrowserToolbar from '$lib/components/BrowserToolbar.svelte'
 
-  // Sin motor el hueco nativo nunca se abre, así que basta con pedir el
-  // arranque una vez y dejar que el cromo pinte su estado apagado.
   $effect(() => {
     if (!browser.pendingSpawn || browser.alive || browser.booting) return
     void browser.spawn()
   })
 
   let placeholder = $derived(hostPlaceholder(browser.booting, browser.error))
+
+  function watchHost(node: HTMLElement): () => void {
+    let frame = 0
+    const publish = (): void => {
+      const rect = node.getBoundingClientRect()
+      const show = browser.visible && browser.alive && !browser.menuOpen
+      browser.reportBounds({
+        x: show ? rect.x : 0,
+        y: show ? rect.y : 0,
+        width: show ? rect.width : 0,
+        height: show ? rect.height : 0,
+        visible: show,
+      })
+    }
+    const observer = new ResizeObserver(() => publish())
+    observer.observe(node)
+    const onResize = (): void => publish()
+    window.addEventListener('resize', onResize)
+
+    $effect(() => {
+      void browser.visible
+      void browser.alive
+      void browser.menuOpen
+      publish()
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(publish)
+    })
+
+    return () => {
+      cancelAnimationFrame(frame)
+      observer.disconnect()
+      window.removeEventListener('resize', onResize)
+      browser.reportBounds({ x: 0, y: 0, width: 0, height: 0, visible: false })
+    }
+  }
 </script>
 
 <div class="view">
+  <BrowserTabs />
   <BrowserToolbar />
-  <div class="host">
+  <div class="host" data-browser-host {@attach watchHost}>
     {#if !browser.alive}
       <p class="placeholder">{placeholder}</p>
     {/if}

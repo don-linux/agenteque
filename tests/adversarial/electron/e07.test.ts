@@ -18,6 +18,7 @@ const API_KEYS = [
   'saveLayoutSettings',
   'saveTerminalSettings',
   'saveWorkspaceView',
+  'saveBrowserSettings',
   'shellStatus',
   'ptySpawn',
   'ptyWrite',
@@ -40,6 +41,17 @@ const API_KEYS = [
   'gitGraph',
   'gitSummary',
   'fontPage',
+  'browserSpawn',
+  'browserNewTab',
+  'browserCommand',
+  'browserSetBounds',
+  'browserFocusApp',
+  'browserFocusPage',
+  'browserKill',
+  'onBrowserState',
+  'onBrowserShortcut',
+  'onBrowserFocus',
+  'onBrowserTabOpened',
 ] as const
 const VERSION_KEYS = ['app', 'chrome', 'electron', 'node'] as const
 const MARKER = 'advE07Polluted'

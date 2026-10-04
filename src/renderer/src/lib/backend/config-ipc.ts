@@ -1,6 +1,7 @@
 import type {
   AppConfig,
   AppearanceSettings,
+  BrowserSettings,
   LayoutSettings,
   TerminalSettings,
   WorkspaceView,
@@ -13,6 +14,7 @@ export interface ConfigBackend {
   saveAppearance(appearance: AppearanceSettings): Promise<AppConfig>
   saveLayout(layout: LayoutSettings): Promise<AppConfig>
   saveWorkspaceView(view: WorkspaceView): Promise<AppConfig>
+  saveBrowser(browser: BrowserSettings): Promise<AppConfig>
   recordRecent(path: string): Promise<AppConfig>
   removeRecent(path: string): Promise<AppConfig>
 }
@@ -23,6 +25,7 @@ export const configIpc: ConfigBackend = {
   saveAppearance: (appearance) => window.api.saveAppearanceSettings(appearance),
   saveLayout: (layout) => window.api.saveLayoutSettings(layout),
   saveWorkspaceView: (view) => window.api.saveWorkspaceView(view),
+  saveBrowser: (browser) => window.api.saveBrowserSettings(browser),
   recordRecent: (path) => window.api.recordRecentFolder(path),
   removeRecent: (path) => window.api.removeRecentFolder(path),
 }
