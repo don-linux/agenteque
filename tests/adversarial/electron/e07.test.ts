@@ -39,6 +39,7 @@ const API_KEYS = [
   'gitRefs',
   'gitGraph',
   'gitSummary',
+  'fontPage',
 ] as const
 const VERSION_KEYS = ['app', 'chrome', 'electron', 'node'] as const
 const MARKER = 'advE07Polluted'

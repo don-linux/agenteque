@@ -8,6 +8,7 @@ import type {
 import {
   type AgentequeApi,
   type EntryRequest,
+  type FontPageRequest,
   type GitGraphResult,
   type GitRefsResult,
   type GitSummaryResult,
@@ -72,6 +73,7 @@ const api: AgentequeApi = {
     ipcRenderer.invoke(IpcChannel.gitGraph, root, selected) as Promise<GitGraphResult>,
   gitSummary: (root: string) =>
     ipcRenderer.invoke(IpcChannel.gitSummary, root) as Promise<GitSummaryResult>,
+  fontPage: (request: FontPageRequest) => ipcRenderer.invoke(IpcChannel.fontPage, request),
 }
 
 contextBridge.exposeInMainWorld('api', api)

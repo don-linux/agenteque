@@ -5,6 +5,7 @@ import type {
   TerminalSettings,
   WorkspaceView,
 } from './config'
+import type { SystemFont } from './fonts'
 import type { GitGraphRepository, GitProbe, GitRefRepository } from './git-text'
 
 export const IpcChannel = {
@@ -38,6 +39,7 @@ export const IpcChannel = {
   gitRefs: 'git:refs',
   gitGraph: 'git:graph',
   gitSummary: 'git:summary',
+  fontPage: 'app:fontPage',
 } as const
 
 export interface AppVersions {
@@ -117,6 +119,19 @@ export interface GitSummaryResult {
   error?: string
 }
 
+export interface FontPageRequest {
+  query: string
+  offset: number
+  limit: number
+}
+
+export interface FontPageResult {
+  families: SystemFont[]
+  total: number
+  scanning: boolean
+  error?: string
+}
+
 /**
  * Cada comando de configuración devuelve el `AppConfig` completo, igual que
  * hacía el backend Rust: el renderer nunca compone el estado a trozos.
@@ -153,4 +168,5 @@ export interface AgentequeApi {
   gitRefs(root: string): Promise<GitRefsResult>
   gitGraph(root: string, selected: string[]): Promise<GitGraphResult>
   gitSummary(root: string): Promise<GitSummaryResult>
+  fontPage(request: FontPageRequest): Promise<FontPageResult>
 }

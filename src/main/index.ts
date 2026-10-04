@@ -14,6 +14,7 @@ import {
 } from '../shared/config'
 import { type AppVersions, type EntryRequest, type MoveRequest, IpcChannel } from '../shared/ipc'
 import { ConfigStore } from './config-store'
+import { readFontPage } from './font-catalog'
 import { readGitGraph, readGitRefs, readGitSummary } from './git-host'
 import {
   currentShell,
@@ -478,6 +479,15 @@ function registerNativeHandlers(): void {
     }
   })
 
+  ipcMain.handle(IpcChannel.fontPage, (event, payload: unknown) => {
+    trusted(event, IpcChannel.fontPage)
+    const row = asRecord(payload)
+    if (!row) throw new Error('Solicitud inválida')
+    const query = typeof row.query === 'string' ? row.query : ''
+    const offset = typeof row.offset === 'number' ? row.offset : 0
+    const limit = typeof row.limit === 'number' ? row.limit : 40
+    return readFontPage(query, offset, limit)
+  })
 }
 
 /**

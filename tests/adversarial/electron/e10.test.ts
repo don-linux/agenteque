@@ -42,6 +42,7 @@ const BRIDGE_KEYS = [
   'gitRefs',
   'gitGraph',
   'gitSummary',
+  'fontPage',
 ] as readonly string[]
 
 const SENTINEL = 'ADV-E10-SENTINEL'

@@ -6,3 +6,6 @@ export const GIT_CLIENT_MISSING_MESSAGE = 'No se detectó ningún cliente de Git
 
 /** La carpeta se abrió, pero no es un repositorio. */
 export const GIT_NOT_REPOSITORY_MESSAGE = 'Esta carpeta no es un repositorio de Git'
+
+/** El inventario de fuentes del sistema no pudo leerse. */
+export const FONT_LIST_FAILED_MESSAGE = 'No se pudieron leer las fuentes del sistema'
