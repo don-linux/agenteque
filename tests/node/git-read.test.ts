@@ -55,15 +55,10 @@ describe('git host', () => {
     expect(graph.repository?.commits[0]?.parents).toHaveLength(1)
     expect(graph.repository?.comparisons[0]?.name).toBe('main')
     expect(graph.repository?.comparisons[0]?.mergeBase).toBeTruthy()
+    expect(() => structuredClone(refs)).not.toThrow()
+    expect(() => structuredClone(graph)).not.toThrow()
   })
 
-  it('can cross an IPC boundary for this repository', async () => {
-    const refs = await readGitRefs('/workspace')
-    expect(() => structuredClone(refs)).not.toThrow()
-    const graph = await readGitGraph('/workspace', ['main'])
-    expect(() => structuredClone(graph)).not.toThrow()
-    expect(graph.repository?.commits.length).toBeGreaterThan(0)
-  })
   it('does not treat a plain folder as a missing git client', async () => {
     const root = tempRoot()
     const refs = await readGitRefs(root)
