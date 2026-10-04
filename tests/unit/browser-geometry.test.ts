@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { rectContains, rectsIntersect, viewFitsHost, type Rect } from '../../src/shared/browser-geometry'
+import {
+  rectContains,
+  rectsIntersect,
+  viewFitsHost,
+  type Rect,
+} from '../../src/shared/browser-geometry'
 
 const host: Rect = { x: 100, y: 80, width: 400, height: 300 }
 const toolbar: Rect = { x: 100, y: 48, width: 400, height: 32 }
