@@ -15,6 +15,11 @@ export default function setup(): void {
     [resolve(root, 'node_modules/electron-vite/bin/electron-vite.js'), 'build'],
     'electron-vite build',
   )
+  run(
+    [resolve(root, 'node_modules/electron-builder/cli.js'), 'install-app-deps'],
+    'electron-builder install-app-deps',
+  )
+  run([resolve(root, 'scripts/stage-node-pty.cjs')], 'stage node-pty')
   run([resolve(root, 'node_modules/electron-builder/cli.js'), '--dir'], 'electron-builder --dir')
 }
 

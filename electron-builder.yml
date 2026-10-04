@@ -5,11 +5,15 @@ directories:
   buildResources: build
 files:
   - out/**/*
-  - node_modules/node-pty/**/*
+  # Production dependencies are packed on their own. node-pty's runtime is staged under out/.
+  - '!node_modules/**'
 asar: true
-# node-pty ships a native .node. Electron cannot load it from inside the asar.
+# The staged node-pty runtime lives under out/. Native files cannot load from inside the asar.
 asarUnpack:
-  - node_modules/node-pty/**/*
+  - out/main/node_modules/node-pty/**/*.node
+  - out/main/node_modules/node-pty/**/*.dll
+  - out/main/node_modules/node-pty/**/*.exe
+  - out/main/node_modules/node-pty/**/spawn-helper
 # Linux entry point filters hostile argv before Electron starts. See scripts/.
 afterPack: ./scripts/filter-packaged-argv.cjs
 electronFuses:

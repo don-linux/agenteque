@@ -29,13 +29,18 @@ function runSmoke(): Promise<{ code: number | null; output: string; elapsedMs: n
 describe('packaged app smoke test', () => {
   beforeAll(() => {
     rmSync(distDir, { recursive: true, force: true })
-    const result = spawnSync(
-      process.execPath,
-      [resolve(root, 'node_modules/electron-builder/cli.js'), '--dir'],
-      { cwd: root, encoding: 'utf8' },
-    )
-    if (result.status !== 0) {
-      throw new Error(`electron-builder --dir failed:\n${result.stdout}\n${result.stderr}`)
+    for (const [script, label] of [
+      [
+        [resolve(root, 'node_modules/electron-builder/cli.js'), 'install-app-deps'],
+        'install-app-deps',
+      ],
+      [[resolve(root, 'scripts/stage-node-pty.cjs')], 'stage node-pty'],
+      [[resolve(root, 'node_modules/electron-builder/cli.js'), '--dir'], 'electron-builder --dir'],
+    ] as const) {
+      const result = spawnSync(process.execPath, script, { cwd: root, encoding: 'utf8' })
+      if (result.status !== 0) {
+        throw new Error(`${label} failed:\n${result.stdout}\n${result.stderr}`)
+      }
     }
   })
 
