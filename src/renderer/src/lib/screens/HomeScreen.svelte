@@ -31,11 +31,6 @@
     </div>
   </header>
 
-  <p class="demo">
-    Esta etapa trae la interfaz completa sobre un workspace de demostración en memoria: el botón
-    abre siempre la misma carpeta de ejemplo y nada toca el disco.
-  </p>
-
   {#if appConfig.recents.length === 0 && appConfig.loaded}
     <p class="empty">Todavía no hay carpetas en el historial.</p>
   {/if}
@@ -104,16 +99,6 @@
     max-width: 34rem;
     margin: 0;
     color: var(--text-muted);
-  }
-
-  .demo {
-    padding: 0.7rem 0.9rem;
-    border: 1px solid var(--border);
-    border-left: 3px solid var(--accent);
-    border-radius: 6px;
-    background: var(--surface);
-    font-size: 0.85rem;
-    line-height: 1.45;
   }
 
   .empty {

@@ -70,7 +70,7 @@ class GitGraphView {
     this.error = null
 
     try {
-      const refs = await window.api.gitRefs(root)
+      const refs = await window.api.gitRefs(String(root))
       if (gen !== this.#gen) return
 
       if (!refs.probe.available) {
@@ -105,7 +105,7 @@ class GitGraphView {
         return
       }
 
-      const graph = await window.api.gitGraph(root, this.selected)
+      const graph = await window.api.gitGraph(root, [...this.selected])
       if (gen !== this.#gen) return
 
       if (graph.error && !graph.repository) {
@@ -119,10 +119,10 @@ class GitGraphView {
       this.commits = graph.repository?.commits ?? []
       this.comparisons = graph.repository?.comparisons ?? []
       this.loading = false
-    } catch {
+    } catch (error) {
       if (gen !== this.#gen) return
       this.#clear(false)
-      this.error = 'Git no responde'
+      this.error = error instanceof Error ? error.message : 'Git no responde'
     }
   }
 

@@ -445,16 +445,26 @@ function registerNativeHandlers(): void {
     deleteEntry(row.root, row.path, asKind(row.kind))
   })
 
-  ipcMain.handle(IpcChannel.gitRefs, (event, root: unknown) => {
+  ipcMain.handle(IpcChannel.gitRefs, async (event, root: unknown) => {
     trusted(event, IpcChannel.gitRefs)
     if (typeof root !== 'string') throw new Error('Falta la carpeta')
-    return readGitRefs(root)
+    try {
+      return await readGitRefs(root)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Git no responde'
+      return { probe: { available: false }, error: message }
+    }
   })
 
-  ipcMain.handle(IpcChannel.gitGraph, (event, root: unknown, selected: unknown) => {
+  ipcMain.handle(IpcChannel.gitGraph, async (event, root: unknown, selected: unknown) => {
     trusted(event, IpcChannel.gitGraph)
     if (typeof root !== 'string') throw new Error('Falta la carpeta')
-    return readGitGraph(root, asStringList(selected))
+    try {
+      return await readGitGraph(root, asStringList(Array.isArray(selected) ? selected : []))
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Git no responde'
+      return { probe: { available: false }, error: message }
+    }
   })
 }
 
