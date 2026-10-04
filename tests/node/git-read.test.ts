@@ -31,6 +31,12 @@ afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
 })
 
+/** Git en Windows devuelve la ruta larga; `realpath` a veces deja el nombre 8.3. */
+function canonicalPath(file: string): string {
+  const resolved = realpathSync.native(file).replace(/^\\\\\?\\/, '')
+  return process.platform === 'win32' ? resolved.toLowerCase() : resolved
+}
+
 describe('git host', () => {
   it('reads the current branch, parents and a comparison', async () => {
     const root = tempRoot()
@@ -77,7 +83,7 @@ describe('git host', () => {
     mkdirSync(nested)
 
     const summary = await readGitSummary(nested)
-    expect(realpathSync(summary.repository?.toplevel ?? '')).toBe(realpathSync(root))
+    expect(canonicalPath(summary.repository?.toplevel ?? '')).toBe(canonicalPath(root))
     expect(summary.repository?.branch).toBe('main')
     expect(summary.repository?.detached).toBe(false)
     expect(() => structuredClone(summary)).not.toThrow()
