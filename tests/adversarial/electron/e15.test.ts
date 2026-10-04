@@ -8,6 +8,8 @@ import { expect, it } from 'vitest'
 import { launchApp, startHostileServer, type LaunchedElectronApp } from '../helpers/electron'
 
 const FAST_EXIT_MS = 15_000
+/** After the trigger lands. Longer than the smoke ready deadline so the log can be read. */
+const AFTER_TRIGGER_MS = 25_000
 const TIMEOUT_EXIT_MS = 35_000
 
 async function launchSmoke(
@@ -25,8 +27,10 @@ async function launchSmoke(
 async function smokeExit(
   launched: LaunchedElectronApp,
   budgetMs: number,
+  trigger?: string,
 ): Promise<{ code: number | null; stdout: string; stderr: string }> {
   let timer: ReturnType<typeof setTimeout> | undefined
+  const triggerLine = trigger === undefined ? '' : `\ntrigger=${trigger}`
   try {
     const code = await Promise.race([
       launched.exited,
@@ -34,7 +38,7 @@ async function smokeExit(
         timer = setTimeout(() => {
           reject(
             new Error(
-              `smoke process still running after ${budgetMs}ms\n--- stdout ---\n${launched.stdout}\n--- stderr ---\n${launched.stderr}`,
+              `smoke process still running after ${budgetMs}ms${triggerLine}\n--- stdout ---\n${launched.stdout}\n--- stderr ---\n${launched.stderr}`,
             ),
           )
         }, budgetMs)
@@ -101,7 +105,7 @@ it('exits 1 when the renderer crashes during --smoke-test', async () => {
     body: page('try { globalThis.api.notifyRendererReady() } catch (e) {}'),
   }))
   const { launched } = await launchSmoke({ ELECTRON_RENDERER_URL: `${server.origin}/e15-crash` })
-  const crashed = launched.app
+  const crashed = await launched.app
     .evaluate(async ({ BrowserWindow }) => {
       const deadline = Date.now() + 10_000
       while (Date.now() < deadline) {
@@ -114,9 +118,10 @@ it('exits 1 when the renderer crashes during --smoke-test', async () => {
       }
       return 'no-window'
     })
-    .catch(() => 'closed')
-  const result = await smokeExit(launched, FAST_EXIT_MS)
-  const detail = `${evidence(result)}\ntrigger=${await crashed}`
+    .catch(() => 'closed' as const)
+  expect(crashed, `trigger=${crashed}`).toBe('crashed')
+  const result = await smokeExit(launched, AFTER_TRIGGER_MS, crashed)
+  const detail = `${evidence(result)}\ntrigger=${crashed}`
   expect(result.code, detail).toBe(1)
   expect(result.stdout, detail).not.toContain('[smoke] OK')
   expect(result.stderr, detail).toContain('render-process-gone')
@@ -147,9 +152,10 @@ it('exits 1 when did-fail-load fires during --smoke-test', async () => {
       }
       return 'no-window'
     }, target)
-    .catch(() => 'closed')
-  const result = await smokeExit(launched, FAST_EXIT_MS)
-  const detail = `${evidence(result)}\ntrigger=${await triggered}`
+    .catch(() => 'closed' as const)
+  expect(triggered, `trigger=${triggered}`).toBe('navigated')
+  const result = await smokeExit(launched, AFTER_TRIGGER_MS, triggered)
+  const detail = `${evidence(result)}\ntrigger=${triggered}`
   expect(result.code, detail).toBe(1)
   expect(result.stdout, detail).not.toContain('[smoke] OK')
   expect(result.stderr, detail).toContain('did-fail-load')
