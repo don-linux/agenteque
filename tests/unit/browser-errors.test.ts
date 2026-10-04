@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { RENDER_CRASHED, clearsRenderCrash, renderCrashedMessage } from '$lib/browser-errors'
+import {
+  PAGE_LOAD_FAILED,
+  RENDER_CRASHED,
+  clearsRenderCrash,
+  formatTabError,
+  renderCrashedMessage,
+} from '$lib/browser-errors'
 
 describe('renderCrashedMessage', () => {
   it('adjunta el status del host entre paréntesis', () => {
@@ -35,5 +41,19 @@ describe('clearsRenderCrash', () => {
     expect(clearsRenderCrash('El navegador se cerró inesperadamente')).toBe(false)
     expect(clearsRenderCrash(`prefijo ${RENDER_CRASHED}`)).toBe(false)
     expect(clearsRenderCrash(renderCrashedMessage('oom\nkilled'))).toBe(true)
+  })
+})
+
+describe('formatTabError', () => {
+  it('traduce el fallo de carga y el crash del guest', () => {
+    expect(formatTabError(null)).toBeNull()
+    expect(formatTabError({ kind: 'crash', status: 'oom' })).toBe(`${RENDER_CRASHED} (oom)`)
+    expect(formatTabError({ kind: 'load', description: 'ERR_NAME_NOT_RESOLVED' })).toBe(
+      `${PAGE_LOAD_FAILED} (ERR_NAME_NOT_RESOLVED)`,
+    )
+    expect(formatTabError({ kind: 'load', description: '  net \n down  ' })).toBe(
+      `${PAGE_LOAD_FAILED} (net down)`,
+    )
+    expect(formatTabError({ kind: 'load', description: '   ' })).toBe(PAGE_LOAD_FAILED)
   })
 })

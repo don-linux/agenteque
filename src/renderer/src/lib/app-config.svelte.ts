@@ -12,18 +12,28 @@ import {
   type TerminalThemeId,
 } from '$lib/terminal-theme'
 import { DEFAULT_UI_THEME_ID, resolveUiThemeId, type UiThemeId } from '$lib/ui-theme'
-import type {
-  AppConfig,
-  AppearanceSettings,
-  LayoutSettings,
-  RecentFolder,
-  TerminalSettings,
-  WorkspaceView,
+import {
+  DEFAULT_BROWSER_RELOAD,
+  DEFAULT_DEVTOOLS_DOCK,
+  resolveBrowserReload,
+  resolveDevtoolsDock,
+  type AppConfig,
+  type AppearanceSettings,
+  type BrowserReload,
+  type BrowserSettings,
+  type DevtoolsDock,
+  type LayoutSettings,
+  type RecentFolder,
+  type TerminalSettings,
+  type WorkspaceView,
 } from '../../../shared/config'
 
 export type {
   AppConfig,
   AppearanceSettings,
+  BrowserReload,
+  BrowserSettings,
+  DevtoolsDock,
   LayoutSettings,
   RecentFolder,
   TerminalSettings,
@@ -57,6 +67,8 @@ class AppConfigState {
   uiTheme = $state<UiThemeId>(DEFAULT_UI_THEME_ID)
   layout = $state<LayoutSettings>({ ...DEFAULT_LAYOUT })
   workspaceViews = $state<WorkspaceView[]>([])
+  browserDevtoolsDock = $state<DevtoolsDock>(DEFAULT_DEVTOOLS_DOCK)
+  browserReload = $state<BrowserReload>(DEFAULT_BROWSER_RELOAD)
   loaded = $state(false)
   error = $state<string | null>(null)
   /** Descarta respuestas de carga o guardado que terminan fuera de orden. */
@@ -70,6 +82,8 @@ class AppConfigState {
     this.uiTheme = resolveUiThemeId(config.appearance.theme)
     this.layout = { ...DEFAULT_LAYOUT, ...config.layout }
     this.workspaceViews = config.workspaceViews
+    this.browserDevtoolsDock = resolveDevtoolsDock(config.browser?.devtoolsDock)
+    this.browserReload = resolveBrowserReload(config.browser?.reload)
     this.error = null
   }
 
@@ -93,6 +107,8 @@ class AppConfigState {
       this.uiTheme = DEFAULT_UI_THEME_ID
       this.layout = { ...DEFAULT_LAYOUT }
       this.workspaceViews = []
+      this.browserDevtoolsDock = DEFAULT_DEVTOOLS_DOCK
+      this.browserReload = DEFAULT_BROWSER_RELOAD
       this.error = messageFrom(error)
     } finally {
       if (gen === this.#gen) {
@@ -178,6 +194,24 @@ class AppConfigState {
 
     try {
       const config = await configIpc.saveLayout(input)
+      if (gen !== this.#gen) return
+      this.apply(config)
+    } catch (error) {
+      if (gen !== this.#gen) return
+      this.error = messageFrom(error)
+    }
+  }
+
+  async saveBrowser(input: BrowserSettings): Promise<void> {
+    const devtoolsDock = resolveDevtoolsDock(input.devtoolsDock)
+    const reload = resolveBrowserReload(input.reload)
+    this.browserDevtoolsDock = devtoolsDock
+    this.browserReload = reload
+
+    const gen = ++this.#gen
+
+    try {
+      const config = await configIpc.saveBrowser({ devtoolsDock, reload })
       if (gen !== this.#gen) return
       this.apply(config)
     } catch (error) {

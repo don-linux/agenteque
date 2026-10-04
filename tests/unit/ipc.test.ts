@@ -6,7 +6,7 @@ describe('IpcChannel', () => {
     const channels = Object.values(IpcChannel)
     expect(new Set(channels).size).toBe(channels.length)
     for (const channel of channels)
-      expect(channel).toMatch(/^(app|config|shell|pty|fs|git):[a-zA-Z-]+$/)
+      expect(channel).toMatch(/^(app|config|shell|pty|fs|git|browser):[a-zA-Z-]+$/)
   })
 
   it('keeps one channel per configuration command', () => {
@@ -16,6 +16,7 @@ describe('IpcChannel', () => {
       'config:saveAppearance',
       'config:saveLayout',
       'config:saveWorkspaceView',
+      'config:saveBrowser',
       'config:recordRecent',
       'config:removeRecent',
     ])

@@ -1,7 +1,5 @@
-import { BROWSER_UNAVAILABLE } from '$lib/backend/inert-browser'
 import type { AppVersions } from '../../../shared/ipc'
 
-export { BROWSER_UNAVAILABLE }
 export type { AppVersions }
 
 export const VERSIONS_UNAVAILABLE = 'No se pudieron leer las versiones del runtime'

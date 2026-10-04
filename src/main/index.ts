@@ -1,10 +1,13 @@
-import { existsSync, readdirSync, unlinkSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import { join, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { app, BrowserWindow, dialog, ipcMain, session, shell, type WebFrameMain } from 'electron'
+import { BrowserHost } from './browser-host'
+import { installLockedSession } from './session-policy'
 import {
   type AppConfig,
   type AppearanceSettings,
+  type BrowserSettings,
   type LayoutSettings,
   type TerminalSettings,
   withoutRecent,
@@ -43,28 +46,7 @@ const SMOKE_TIMEOUT_MS = 20_000
 const SMOKE_HOLD_MS = 2_000
 const MAX_EXTERNAL_URL_LENGTH = 2048
 const MAX_EXTERNAL_OPENS = 8
-const clipboardDenied = new Set<string>(['clipboard-read', 'deprecated-sync-clipboard-read'])
-const chromiumSpoolPrefix = '.org.chromium.Chromium.'
-const SPOOL_SWEEP_MS = 800
-const SPOOL_SWEEP_STEP_MS = 20
-
-/**
- * Camera and microphone share `media`. MIDI sysex is a separate check from
- * `midi`. Approximate geolocation is the same capability as geolocation.
- * Clipboard reads are denied separately by ADV-E18.
- */
-const DENIED_PERMISSIONS = new Set<string>([
-  'media',
-  'geolocation',
-  'geolocation-approximate',
-  'notifications',
-  'midi',
-  'midiSysex',
-])
-
-function permissionDenied(permission: string): boolean {
-  return DENIED_PERMISSIONS.has(permission) || clipboardDenied.has(permission)
-}
+const browserHost = new BrowserHost()
 
 function externalUrlAllowed(raw: string): boolean {
   if (raw.length > MAX_EXTERNAL_URL_LENGTH) return false
@@ -147,6 +129,7 @@ function createWindow(): BrowserWindow {
   })
 
   installNavigationGuard(win.webContents)
+  browserHost.attach(win)
   recoverRenderer(win)
 
   if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) {
@@ -186,46 +169,7 @@ function isTrustedSender(frame: WebFrameMain | null): boolean {
 }
 
 function installSessionGuards(): void {
-  const ses = session.defaultSession
-  ses.setPermissionRequestHandler((_contents, permission, callback) => {
-    callback(!permissionDenied(permission))
-  })
-  ses.setPermissionCheckHandler((_contents, permission) => !permissionDenied(permission))
-  ses.setDevicePermissionHandler(() => false)
-  ses.on('will-download', (event, item) => {
-    event.preventDefault()
-    item.cancel()
-    discardChromiumSpools()
-  })
-}
-
-function discardChromiumSpools(): void {
-  const dirs = [...new Set([app.getPath('downloads'), app.getPath('temp')])]
-  const sweep = (): void => {
-    for (const dir of dirs) unlinkChromiumSpools(dir)
-  }
-  sweep()
-  for (let delayMs = 0; delayMs <= SPOOL_SWEEP_MS; delayMs += SPOOL_SWEEP_STEP_MS) {
-    const timer = setTimeout(sweep, delayMs)
-    timer.unref()
-  }
-}
-
-function unlinkChromiumSpools(dir: string): void {
-  let names: string[]
-  try {
-    names = readdirSync(dir)
-  } catch {
-    return
-  }
-  for (const name of names) {
-    if (!name.startsWith(chromiumSpoolPrefix)) continue
-    try {
-      unlinkSync(join(dir, name))
-    } catch {
-      // The spool can disappear between the listing and the unlink.
-    }
-  }
+  installLockedSession(session.defaultSession)
 }
 
 function registerIpcHandlers(): void {
@@ -243,6 +187,7 @@ function registerIpcHandlers(): void {
 
   registerConfigHandlers(new ConfigStore(app.getPath('userData')))
   registerNativeHandlers()
+  browserHost.install(isTrustedSender)
 }
 
 function handleConfig(channel: string, run: (payload: unknown) => AppConfig): void {
@@ -271,6 +216,9 @@ function registerConfigHandlers(store: ConfigStore): void {
   )
   handleConfig(IpcChannel.configSaveWorkspaceView, (payload) =>
     store.update((config) => withWorkspaceView(config, payload as WorkspaceView)),
+  )
+  handleConfig(IpcChannel.configSaveBrowser, (payload) =>
+    store.update((config) => ({ ...config, browser: payload as BrowserSettings })),
   )
   handleConfig(IpcChannel.configRecordRecent, (payload) =>
     store.update((config) => withRecent(config, String(payload ?? ''))),
@@ -589,6 +537,7 @@ if (!gotSingleInstanceLock) {
 }
 
 app.on('window-all-closed', () => {
+  browserHost.destroyAll()
   ptyKillEvery()
   stopWatching()
   if (process.platform !== 'darwin') app.quit()

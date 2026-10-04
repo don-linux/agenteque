@@ -1,12 +1,18 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
+import type { BrowserShortcutName } from '../shared/browser'
 import type {
   AppearanceSettings,
+  BrowserSettings,
   LayoutSettings,
   TerminalSettings,
   WorkspaceView,
 } from '../shared/config'
 import {
   type AgentequeApi,
+  type BrowserBoot,
+  type BrowserBounds,
+  type BrowserCommand,
+  type BrowserTabState,
   type EntryRequest,
   type FontPageRequest,
   type GitGraphResult,
@@ -43,6 +49,8 @@ const api: AgentequeApi = {
     ipcRenderer.invoke(IpcChannel.configSaveLayout, layout),
   saveWorkspaceView: (view: WorkspaceView) =>
     ipcRenderer.invoke(IpcChannel.configSaveWorkspaceView, view),
+  saveBrowserSettings: (browser: BrowserSettings) =>
+    ipcRenderer.invoke(IpcChannel.configSaveBrowser, browser),
   recordRecentFolder: (path: string) => ipcRenderer.invoke(IpcChannel.configRecordRecent, path),
   removeRecentFolder: (path: string) => ipcRenderer.invoke(IpcChannel.configRemoveRecent, path),
   shellStatus: () => ipcRenderer.invoke(IpcChannel.shellStatus) as Promise<ShellStatus>,
@@ -74,6 +82,26 @@ const api: AgentequeApi = {
   gitSummary: (root: string) =>
     ipcRenderer.invoke(IpcChannel.gitSummary, root) as Promise<GitSummaryResult>,
   fontPage: (request: FontPageRequest) => ipcRenderer.invoke(IpcChannel.fontPage, request),
+  browserSpawn: (url: string) =>
+    ipcRenderer.invoke(IpcChannel.browserSpawn, url) as Promise<BrowserBoot>,
+  browserNewTab: (url: string) =>
+    ipcRenderer.invoke(IpcChannel.browserNewTab, url) as Promise<BrowserTabState>,
+  browserCommand: (command: BrowserCommand) =>
+    ipcRenderer.invoke(IpcChannel.browserCommand, command),
+  browserSetBounds: (bounds: BrowserBounds) => ipcRenderer.send(IpcChannel.browserBounds, bounds),
+  browserFocusApp: () => ipcRenderer.invoke(IpcChannel.browserFocusApp),
+  browserFocusPage: () => ipcRenderer.invoke(IpcChannel.browserFocusPage),
+  browserKill: () => ipcRenderer.invoke(IpcChannel.browserKill),
+  onBrowserState: (listener) => subscribe<BrowserTabState>(IpcChannel.browserState, listener),
+  onBrowserShortcut: (listener) =>
+    subscribe<BrowserShortcutName>(IpcChannel.browserShortcut, listener),
+  onBrowserFocus: (listener) => {
+    const wrapped = (): void => listener()
+    ipcRenderer.on(IpcChannel.browserFocus, wrapped)
+    return () => ipcRenderer.removeListener(IpcChannel.browserFocus, wrapped)
+  },
+  onBrowserTabOpened: (listener) =>
+    subscribe<BrowserTabState>(IpcChannel.browserTabOpened, listener),
 }
 
 contextBridge.exposeInMainWorld('api', api)

@@ -56,6 +56,14 @@ export const DEFAULT_TERMINAL_BOTTOM = 280
 export const DEFAULT_TERMINAL_RIGHT = 380
 export const DEFAULT_TERMINAL_DOCK = 'bottom'
 
+export const DEVTOOLS_DOCKS = ['right', 'left', 'bottom', 'undocked'] as const
+export type DevtoolsDock = (typeof DEVTOOLS_DOCKS)[number]
+export const DEFAULT_DEVTOOLS_DOCK: DevtoolsDock = 'right'
+
+export const BROWSER_RELOADS = ['normal', 'nocache'] as const
+export type BrowserReload = (typeof BROWSER_RELOADS)[number]
+export const DEFAULT_BROWSER_RELOAD: BrowserReload = 'normal'
+
 export const MAX_RECENT_FOLDERS = 12
 
 export interface RecentFolder {
@@ -88,6 +96,11 @@ export interface WorkspaceView {
   visibleFolders: string[]
 }
 
+export interface BrowserSettings {
+  devtoolsDock: DevtoolsDock
+  reload: BrowserReload
+}
+
 export interface AppConfig {
   version: number
   recents: RecentFolder[]
@@ -95,6 +108,7 @@ export interface AppConfig {
   appearance: AppearanceSettings
   layout: LayoutSettings
   workspaceViews: WorkspaceView[]
+  browser: BrowserSettings
 }
 
 export function defaultAppConfig(): AppConfig {
@@ -115,6 +129,10 @@ export function defaultAppConfig(): AppConfig {
       terminalDock: DEFAULT_TERMINAL_DOCK,
     },
     workspaceViews: [],
+    browser: {
+      devtoolsDock: DEFAULT_DEVTOOLS_DOCK,
+      reload: DEFAULT_BROWSER_RELOAD,
+    },
   }
 }
 
@@ -189,6 +207,24 @@ function sanitizeLayout(value: unknown): LayoutSettings {
   }
 }
 
+export function resolveDevtoolsDock(value: unknown): DevtoolsDock {
+  return typeof value === 'string' && (DEVTOOLS_DOCKS as readonly string[]).includes(value)
+    ? (value as DevtoolsDock)
+    : DEFAULT_DEVTOOLS_DOCK
+}
+
+export function resolveBrowserReload(value: unknown): BrowserReload {
+  return value === 'nocache' ? 'nocache' : DEFAULT_BROWSER_RELOAD
+}
+
+function sanitizeBrowser(value: unknown): BrowserSettings {
+  const row = asRecord(value)
+  return {
+    devtoolsDock: resolveDevtoolsDock(row?.devtoolsDock),
+    reload: resolveBrowserReload(row?.reload),
+  }
+}
+
 function sanitizeWorkspaceViews(value: unknown): WorkspaceView[] {
   if (!Array.isArray(value)) return []
 
@@ -216,6 +252,7 @@ export function sanitizeConfig(value: unknown): AppConfig {
     appearance: sanitizeAppearance(row.appearance),
     layout: sanitizeLayout(row.layout),
     workspaceViews: sanitizeWorkspaceViews(row.workspaceViews),
+    browser: sanitizeBrowser(row.browser),
   }
 }
 

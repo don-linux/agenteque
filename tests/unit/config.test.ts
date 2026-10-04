@@ -25,6 +25,7 @@ describe('defaultAppConfig', () => {
         terminalDock: 'bottom',
       },
       workspaceViews: [],
+      browser: { devtoolsDock: 'right', reload: 'normal' },
     })
   })
 })
@@ -97,6 +98,32 @@ describe('sanitizeConfig', () => {
 
   it('always writes the current version, whatever was on disk', () => {
     expect(sanitizeConfig({ version: 99 }).version).toBe(CONFIG_VERSION)
+    expect(CONFIG_VERSION).toBe(1)
+  })
+
+  it('fills browser defaults and keeps only the docks and reload modes we store', () => {
+    expect(sanitizeConfig({}).browser).toEqual({ devtoolsDock: 'right', reload: 'normal' })
+    expect(sanitizeConfig({ browser: { devtoolsDock: 'detach', reload: 'hard' } }).browser).toEqual(
+      {
+        devtoolsDock: 'right',
+        reload: 'normal',
+      },
+    )
+    expect(
+      sanitizeConfig({ browser: { devtoolsDock: 'left', reload: 'nocache' } }).browser,
+    ).toEqual({ devtoolsDock: 'left', reload: 'nocache' })
+    expect(sanitizeConfig({ browser: { devtoolsDock: 'bottom' } }).browser.devtoolsDock).toBe(
+      'bottom',
+    )
+    expect(sanitizeConfig({ browser: { devtoolsDock: 'undocked' } }).browser.devtoolsDock).toBe(
+      'undocked',
+    )
+    expect(
+      sanitizeConfig({ browser: { devtoolsDock: 'right', reload: 'normal' } }).browser,
+    ).toEqual({
+      devtoolsDock: 'right',
+      reload: 'normal',
+    })
   })
 })
 
