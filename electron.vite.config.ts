@@ -3,7 +3,12 @@ import { svelte } from '@sveltejs/vite-plugin-svelte'
 import { defineConfig } from 'electron-vite'
 
 export default defineConfig({
-  main: {},
+  main: {
+    build: {
+      // node-pty is a native addon. Bundling it would drop the .node binary.
+      externalizeDeps: true,
+    },
+  },
   preload: {
     build: {
       rolldownOptions: {

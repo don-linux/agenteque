@@ -19,7 +19,10 @@
     "test:build": "vitest run --project build",
     "test:adversarial": "vitest run --project adversarial",
     "dist": "electron-vite build && electron-builder",
-    "postinstall": "install-electron"
+    "postinstall": "install-electron && electron-builder install-app-deps"
+  },
+  "dependencies": {
+    "node-pty": "1.1.0"
   },
   "devDependencies": {
     "@codemirror/commands": "6.11.1",

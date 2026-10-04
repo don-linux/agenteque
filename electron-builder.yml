@@ -5,7 +5,11 @@ directories:
   buildResources: build
 files:
   - out/**/*
+  - node_modules/node-pty/**/*
 asar: true
+# node-pty ships a native .node. Electron cannot load it from inside the asar.
+asarUnpack:
+  - node_modules/node-pty/**/*
 # Linux entry point filters hostile argv before Electron starts. See scripts/.
 afterPack: ./scripts/filter-packaged-argv.cjs
 electronFuses:

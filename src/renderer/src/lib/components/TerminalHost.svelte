@@ -1,5 +1,6 @@
 <script lang="ts">
   import TerminalPane from '$lib/components/TerminalPane.svelte'
+  import { SHELL_MISSING_MESSAGE, shellStatus } from '$lib/shell-status.svelte'
   import { terminal } from '$lib/terminal.svelte'
   import { tilePlan } from '$lib/terminal-tile'
 
@@ -23,7 +24,9 @@
   bind:clientWidth={hostWidth}
   bind:clientHeight={hostHeight}
 >
-  {#if tiles && terminal.sessions.length === 0}
+  {#if shellStatus.available === false}
+    <p class="empty">{SHELL_MISSING_MESSAGE}</p>
+  {:else if tiles && terminal.sessions.length === 0}
     <p class="empty">Añade una terminal.</p>
   {:else}
     {#each terminal.sessions as session, index (session.id)}

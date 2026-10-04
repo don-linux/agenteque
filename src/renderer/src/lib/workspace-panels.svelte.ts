@@ -1,6 +1,14 @@
 import { appConfig, type LayoutSettings } from '$lib/app-config.svelte'
+import { gitGraph } from '$lib/git-graph.svelte'
 import { clampPanelSize, DEFAULT_TREE_WIDTH, MIN_TREE_WIDTH, treeReserve } from '$lib/panel-resize'
-import { applyShowTree, applyTreeToggle, type SidebarState } from '$lib/sidebar-view'
+import {
+  applyGitToggle,
+  applyShowTree,
+  applyTreeToggle,
+  gitOpensFromTree,
+  type SidebarState,
+  type SidebarView,
+} from '$lib/sidebar-view'
 import type { TerminalDock } from '$lib/terminal-dock'
 import { terminal } from '$lib/terminal.svelte'
 
@@ -11,6 +19,7 @@ import { terminal } from '$lib/terminal.svelte'
 class WorkspacePanels {
   treeVisible = $state(true)
   treeWidth = $state(DEFAULT_TREE_WIDTH)
+  sidebarView = $state<SidebarView>('tree')
 
   #hydrated = false
 
@@ -27,6 +36,14 @@ class WorkspacePanels {
   /** Ancho con el que la terminal tiene que contar: cero si el árbol está oculto. */
   get treeSpace(): number {
     return this.treeVisible ? this.treeWidth : 0
+  }
+
+  get gitVisible(): boolean {
+    return this.treeVisible && this.sidebarView === 'git'
+  }
+
+  #sidebar(): SidebarState {
+    return { visible: this.treeVisible, view: this.sidebarView }
   }
 
   setTreeWidth(pixels: number, viewport: number): void {
@@ -48,13 +65,20 @@ class WorkspacePanels {
     const visibilityChanged = next.visible !== this.treeVisible
 
     this.treeVisible = next.visible
+    this.sidebarView = next.view
 
     if (becameVisible) this.fit(window.innerWidth, window.innerHeight)
     if (visibilityChanged) this.persist()
   }
 
   toggleTree(): void {
-    this.#applySidebar(applyTreeToggle({ visible: this.treeVisible }))
+    this.#applySidebar(applyTreeToggle(this.#sidebar()))
+  }
+
+  toggleGit(): void {
+    const current = this.#sidebar()
+    if (gitOpensFromTree(current)) gitGraph.resetSelection()
+    this.#applySidebar(applyGitToggle(current))
   }
 
   showTree(): void {

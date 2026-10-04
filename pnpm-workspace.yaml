@@ -1,6 +1,7 @@
 onlyBuiltDependencies:
   - electron
   - esbuild
+  - node-pty
 
 ignoredBuiltDependencies:
   - electron-winstaller

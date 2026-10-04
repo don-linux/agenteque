@@ -1,4 +1,11 @@
-export const FOOTER_ACTION_IDS = ['home', 'folder', 'settings', 'terminal', 'browser'] as const
+export const FOOTER_ACTION_IDS = [
+  'home',
+  'folder',
+  'settings',
+  'terminal',
+  'browser',
+  'git',
+] as const
 
 export type FooterActionId = (typeof FOOTER_ACTION_IDS)[number]
 
@@ -17,6 +24,7 @@ export function runFooterAction(
     folder: () => void
     terminal: () => void
     browser: () => void
+    git: () => void
   },
 ): void {
   switch (footerActionIntent(id)) {
@@ -31,6 +39,9 @@ export function runFooterAction(
       return
     case 'browser':
       actions.browser()
+      return
+    case 'git':
+      actions.git()
       return
     case 'idle':
     case 'settings':

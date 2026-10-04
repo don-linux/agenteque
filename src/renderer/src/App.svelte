@@ -2,6 +2,8 @@
   import { onMount } from 'svelte'
   import { appConfig } from '$lib/app-config.svelte'
   import { ROUTES } from '$lib/app-routes'
+  import { workspaceIpc } from '$lib/backend/workspace-ipc'
+  import { terminalIpc } from '$lib/backend/terminal-ipc'
   import DeleteEntryModal from '$lib/components/DeleteEntryModal.svelte'
   import FolderVisibilityModal from '$lib/components/FolderVisibilityModal.svelte'
   import ToastHost from '$lib/components/ToastHost.svelte'
@@ -10,9 +12,12 @@
   import { router } from '$lib/router.svelte'
   import HomeScreen from '$lib/screens/HomeScreen.svelte'
   import SettingsScreen from '$lib/screens/SettingsScreen.svelte'
+  import { shellStatus } from '$lib/shell-status.svelte'
   import WorkspaceScreen from '$lib/screens/WorkspaceScreen.svelte'
   import { settingsEditor } from '$lib/settings-editor.svelte'
   import { applyTheme } from '$lib/ui-theme'
+  import { terminal } from '$lib/terminal.svelte'
+  import { useTerminalBackend } from '$lib/terminal-preview-session'
   import { workspace } from '$lib/workspace.svelte'
 
   let route = $derived(router.route)
@@ -31,6 +36,15 @@
 
   onMount(() => {
     const stop = router.start()
+    if (typeof window.api.ptySpawn === 'function') {
+      workspace.use(workspaceIpc)
+      terminal.use(terminalIpc)
+      useTerminalBackend(terminalIpc)
+      void shellStatus.load()
+      window.api.onWorkspaceChanged((root) => {
+        if (workspace.root === root) void workspace.refreshTree()
+      })
+    }
     window.api.notifyRendererReady()
     void appConfig.load()
     return stop

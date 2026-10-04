@@ -124,8 +124,8 @@ export function baseNameOf(path: string): string {
  * too long to read. Trims trailing `/` and splits only on `/`.
  */
 export function folderNameOf(root: string): string {
-  const trimmed = root.replace(/\/+$/, '')
-  const index = trimmed.lastIndexOf('/')
+  const trimmed = root.replace(/[/\\]+$/, '')
+  const index = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\'))
   const name = index < 0 ? trimmed : trimmed.slice(index + 1)
   return name || trimmed || root
 }

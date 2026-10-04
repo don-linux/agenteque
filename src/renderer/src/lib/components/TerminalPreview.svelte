@@ -3,6 +3,7 @@
   import { Terminal } from '@xterm/xterm'
   import { FitAddon } from '@xterm/addon-fit'
   import { xtermFontFamily } from '$lib/terminal-font'
+  import { SHELL_MISSING_MESSAGE, shellStatus } from '$lib/shell-status.svelte'
   import {
     TERMINAL_PREVIEW_ROWS,
     TERMINAL_PREVIEW_UNAVAILABLE,
@@ -83,7 +84,11 @@
   style:--preview-height="{hostHeight}px"
   aria-hidden="true"
 >
-  <div class="host" {@attach attachPreview}></div>
+  {#if shellStatus.available === false}
+    <p class="missing">{SHELL_MISSING_MESSAGE}</p>
+  {:else}
+    <div class="host" {@attach attachPreview}></div>
+  {/if}
 </div>
 
 <style>
@@ -117,5 +122,12 @@
 
   .host :global(.xterm-helper-textarea) {
     display: none;
+  }
+
+  .missing {
+    margin: 0;
+    padding: 0.6rem 0.75rem;
+    color: var(--text-faint);
+    font-size: 0.78rem;
   }
 </style>

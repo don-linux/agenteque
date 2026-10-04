@@ -1,5 +1,6 @@
 <script lang="ts">
   import Folder from '@lucide/svelte/icons/folder'
+  import GitBranch from '@lucide/svelte/icons/git-branch'
   import Globe from '@lucide/svelte/icons/globe'
   import House from '@lucide/svelte/icons/house'
   import Settings from '@lucide/svelte/icons/settings'
@@ -25,6 +26,7 @@
     settings: 'Configuración',
     terminal: 'Terminal',
     browser: 'Navegador',
+    git: 'Git',
   }
 
   const titles: Record<FooterActionId, string> = {
@@ -37,6 +39,7 @@
     browser: `Navegador (${shortcutLabel('Ctrl+B')}) · desde la terminal, ${shortcutLabel(
       'Ctrl+Shift+B',
     )}`,
+    git: `Git (${shortcutLabel('Ctrl+G')})`,
   }
 
   function onActionClick(id: FooterActionId, event: MouseEvent): void {
@@ -54,6 +57,9 @@
       },
       browser: () => {
         browser.toggle()
+      },
+      git: () => {
+        panels.toggleGit()
       },
     })
   }
@@ -80,14 +86,17 @@
             {
               active:
                 (id === 'terminal' && (terminal.open || terminal.surface === 'terminals')) ||
-                (id === 'browser' && surface.current === 'browser'),
+                (id === 'browser' && surface.current === 'browser') ||
+                (id === 'git' && panels.gitVisible),
             },
           ]}
           aria-pressed={id === 'terminal'
             ? terminal.open || terminal.surface === 'terminals'
             : id === 'browser'
               ? surface.current === 'browser'
-              : undefined}
+              : id === 'git'
+                ? panels.gitVisible
+                : undefined}
           aria-label={labels[id]}
           title={titles[id]}
           onclick={(event) => onActionClick(id, event)}
@@ -98,6 +107,8 @@
             <Folder size={16} strokeWidth={1.75} aria-hidden="true" />
           {:else if id === 'browser'}
             <Globe size={16} strokeWidth={1.75} aria-hidden="true" />
+          {:else if id === 'git'}
+            <GitBranch size={16} strokeWidth={1.75} aria-hidden="true" />
           {:else}
             <SquareTerminal size={16} strokeWidth={1.75} aria-hidden="true" />
           {/if}

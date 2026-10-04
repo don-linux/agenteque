@@ -52,6 +52,10 @@ class TerminalPanelState {
   activeId = $state<string | null>(null)
 
   #backend: TerminalBackend = demoTerminal
+
+  use(backend: TerminalBackend): void {
+    this.#backend = backend
+  }
   #nextSerial = 1
   #spawning = new Set<string>()
   #writers = new Map<string, (chunk: string) => void>()
