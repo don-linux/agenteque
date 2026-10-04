@@ -41,6 +41,7 @@ const BRIDGE_KEYS = [
   'onWorkspaceChanged',
   'gitRefs',
   'gitGraph',
+  'gitSummary',
 ] as readonly string[]
 
 const SENTINEL = 'ADV-E10-SENTINEL'

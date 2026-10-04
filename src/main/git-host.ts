@@ -65,6 +65,18 @@ export interface GitGraphResult {
   error?: string
 }
 
+export interface GitSummaryRepository {
+  toplevel: string
+  branch?: string
+  detached: boolean
+}
+
+export interface GitSummaryResult {
+  probe: GitProbe
+  repository?: GitSummaryRepository
+  error?: string
+}
+
 interface GitBinary {
   path: string
   version: string
@@ -362,6 +374,49 @@ export async function readGitRefs(root: string): Promise<GitRefsResult> {
       probe: readyProbe(binary),
       error: error instanceof Error ? error.message : 'Git no responde',
     }
+  }
+}
+
+export async function readGitSummary(root: string): Promise<GitSummaryResult> {
+  const cwd = await directoryOrThrow(root)
+  let binary: GitBinary | null
+  try {
+    binary = await discoverGit()
+  } catch (error) {
+    return {
+      probe: missingProbe(),
+      error: error instanceof Error ? error.message : GIT_CLIENT_MISSING_MESSAGE,
+    }
+  }
+  if (!binary) return { probe: missingProbe(), error: GIT_CLIENT_MISSING_MESSAGE }
+
+  const top = await runGit(binary.path, cwd, ['rev-parse', '--show-toplevel'], COMMAND_TIMEOUT_MS)
+  if (top.code !== 0 || top.stdout.trim() === '') {
+    if (isDubiousOwnership(top.stderr)) {
+      return {
+        probe: readyProbe(binary),
+        error: `Git no lee esta carpeta porque pertenece a otro usuario. Para confiar en ella: git config --global --add safe.directory ${shellQuote(cwd)}`,
+      }
+    }
+    if (isNotARepositoryMessage(top.stderr)) return { probe: readyProbe(binary) }
+    return { probe: readyProbe(binary), error: top.stderr || 'Git no responde' }
+  }
+
+  const symbolic = await runGit(
+    binary.path,
+    cwd,
+    ['symbolic-ref', '--short', 'HEAD'],
+    COMMAND_TIMEOUT_MS,
+  )
+  const name = symbolic.code === 0 ? symbolic.stdout.trim() : ''
+  const detached = !isSafeRef(name)
+  return {
+    probe: readyProbe(binary),
+    repository: {
+      toplevel: top.stdout.trim(),
+      ...(detached ? {} : { branch: name }),
+      detached,
+    },
   }
 }
 

@@ -38,6 +38,7 @@ const API_KEYS = [
   'onWorkspaceChanged',
   'gitRefs',
   'gitGraph',
+  'gitSummary',
 ] as const
 const VERSION_KEYS = ['app', 'chrome', 'electron', 'node'] as const
 const MARKER = 'advE07Polluted'

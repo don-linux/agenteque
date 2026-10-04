@@ -1,9 +1,9 @@
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { readGitGraph, readGitRefs } from '../../src/main/git-host'
+import { readGitGraph, readGitRefs, readGitSummary } from '../../src/main/git-host'
 
 const roots: string[] = []
 
@@ -64,5 +64,35 @@ describe('git host', () => {
     const refs = await readGitRefs(root)
     expect(refs.probe.available).toBe(true)
     expect(refs.repository).toBeUndefined()
+
+    const summary = await readGitSummary(root)
+    expect(summary.probe.available).toBe(true)
+    expect(summary.repository).toBeUndefined()
+  })
+
+  it('names the repository root when the opened folder is nested', async () => {
+    const root = tempRoot()
+    git(root, ['init', '-b', 'main'])
+    const nested = join(root, 'nested')
+    mkdirSync(nested)
+
+    const summary = await readGitSummary(nested)
+    expect(realpathSync(summary.repository?.toplevel ?? '')).toBe(realpathSync(root))
+    expect(summary.repository?.branch).toBe('main')
+    expect(summary.repository?.detached).toBe(false)
+    expect(() => structuredClone(summary)).not.toThrow()
+  })
+
+  it('reports a detached HEAD without a branch name', async () => {
+    const root = tempRoot()
+    git(root, ['init', '-b', 'main'])
+    writeFileSync(join(root, 'README.md'), 'a\n')
+    git(root, ['add', 'README.md'])
+    git(root, ['commit', '-m', 'first'])
+    git(root, ['checkout', '--detach'])
+
+    const summary = await readGitSummary(root)
+    expect(summary.repository?.detached).toBe(true)
+    expect(summary.repository?.branch).toBeUndefined()
   })
 })

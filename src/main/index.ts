@@ -14,7 +14,7 @@ import {
 } from '../shared/config'
 import { type AppVersions, type EntryRequest, type MoveRequest, IpcChannel } from '../shared/ipc'
 import { ConfigStore } from './config-store'
-import { readGitGraph, readGitRefs } from './git-host'
+import { readGitGraph, readGitRefs, readGitSummary } from './git-host'
 import {
   currentShell,
   ptyKill,
@@ -466,6 +466,18 @@ function registerNativeHandlers(): void {
       return { probe: { available: false }, error: message }
     }
   })
+
+  ipcMain.handle(IpcChannel.gitSummary, async (event, root: unknown) => {
+    trusted(event, IpcChannel.gitSummary)
+    if (typeof root !== 'string') throw new Error('Falta la carpeta')
+    try {
+      return await readGitSummary(root)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Git no responde'
+      return { probe: { available: false }, error: message }
+    }
+  })
+
 }
 
 /**

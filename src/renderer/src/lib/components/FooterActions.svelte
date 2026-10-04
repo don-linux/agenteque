@@ -12,6 +12,8 @@
     runFooterAction,
     type FooterActionId,
   } from '$lib/footer-actions'
+  import { gitFooter } from '$lib/git-footer.svelte'
+  import { gitFooterButtonTitle } from '$lib/git-footer'
   import { shortcutLabel } from '$lib/platform'
   import { router } from '$lib/router.svelte'
   import { dockFromAlt } from '$lib/terminal-dock'
@@ -29,7 +31,7 @@
     git: 'Git',
   }
 
-  const titles: Record<FooterActionId, string> = {
+  const titles: Record<Exclude<FooterActionId, 'git'>, string> = {
     home: 'Inicio',
     folder: 'Cambiar carpeta',
     settings: 'Configuración',
@@ -39,8 +41,14 @@
     browser: `Navegador (${shortcutLabel('Ctrl+B')}) · desde la terminal, ${shortcutLabel(
       'Ctrl+Shift+B',
     )}`,
-    git: `Git (${shortcutLabel('Ctrl+G')})`,
   }
+
+  const gitShortcut = shortcutLabel('Ctrl+G')
+  let gitTitle = $derived(gitFooterButtonTitle(gitFooter.state, gitShortcut))
+
+  $effect(() => {
+    void gitFooter.setRoot(workspace.root)
+  })
 
   function onActionClick(id: FooterActionId, event: MouseEvent): void {
     runFooterAction(id, {
@@ -60,6 +68,7 @@
       },
       git: () => {
         panels.toggleGit()
+        void gitFooter.refresh()
       },
     })
   }
@@ -98,7 +107,7 @@
                 ? panels.gitVisible
                 : undefined}
           aria-label={labels[id]}
-          title={titles[id]}
+          title={id === 'git' ? gitTitle : titles[id]}
           onclick={(event) => onActionClick(id, event)}
         >
           {#if id === 'home'}

@@ -37,6 +37,7 @@ export const IpcChannel = {
   workspaceChanged: 'fs:changed',
   gitRefs: 'git:refs',
   gitGraph: 'git:graph',
+  gitSummary: 'git:summary',
 } as const
 
 export interface AppVersions {
@@ -104,6 +105,18 @@ export interface GitGraphResult {
   error?: string
 }
 
+export interface GitSummaryRepository {
+  toplevel: string
+  branch?: string
+  detached: boolean
+}
+
+export interface GitSummaryResult {
+  probe: GitProbe
+  repository?: GitSummaryRepository
+  error?: string
+}
+
 /**
  * Cada comando de configuración devuelve el `AppConfig` completo, igual que
  * hacía el backend Rust: el renderer nunca compone el estado a trozos.
@@ -139,4 +152,5 @@ export interface AgentequeApi {
   onWorkspaceChanged(listener: (root: string) => void): () => void
   gitRefs(root: string): Promise<GitRefsResult>
   gitGraph(root: string, selected: string[]): Promise<GitGraphResult>
+  gitSummary(root: string): Promise<GitSummaryResult>
 }

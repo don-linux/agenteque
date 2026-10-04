@@ -10,6 +10,7 @@ import {
   type EntryRequest,
   type GitGraphResult,
   type GitRefsResult,
+  type GitSummaryResult,
   type MoveRequest,
   type PtyChunk,
   type PtyExit,
@@ -69,6 +70,8 @@ const api: AgentequeApi = {
   gitRefs: (root: string) => ipcRenderer.invoke(IpcChannel.gitRefs, root) as Promise<GitRefsResult>,
   gitGraph: (root: string, selected: string[]) =>
     ipcRenderer.invoke(IpcChannel.gitGraph, root, selected) as Promise<GitGraphResult>,
+  gitSummary: (root: string) =>
+    ipcRenderer.invoke(IpcChannel.gitSummary, root) as Promise<GitSummaryResult>,
 }
 
 contextBridge.exposeInMainWorld('api', api)
