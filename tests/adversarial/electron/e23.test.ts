@@ -264,18 +264,14 @@ async function dockSide(app: ElectronApplication, id: number): Promise<string | 
     if (!devtools || devtools.isDestroyed()) return null
     return devtools.executeJavaScript(`(() => {
       try {
-        const ui = globalThis.UI
-        if (!ui) return null
-        const direct = ui.dockController
-        if (direct && typeof direct.dockSide === 'function') return String(direct.dockSide())
-        const ctor = ui.DockController && (ui.DockController.DockController || ui.DockController)
-        if (ctor && typeof ctor.instance === 'function') {
-          const instance = ctor.instance()
-          if (instance && typeof instance.dockSide === 'function') return String(instance.dockSide())
-        }
+        const eui = globalThis.EUI
+        const ctor =
+          eui && eui.DockController && (eui.DockController.DockController || eui.DockController)
+        const instance = ctor && typeof ctor.instance === 'function' ? ctor.instance() : null
+        if (instance && typeof instance.dockSide === 'function') return String(instance.dockSide())
         return null
-      } catch (error) {
-        return 'error:' + String(error)
+      } catch {
+        return null
       }
     })()`)
   }, id)
@@ -392,7 +388,7 @@ it('keeps mouse focus on the page only while the view is attached', async () => 
       return dom.document.elementFromPoint(at.x, at.y)?.textContent ?? ''
     }, point)
     expect(hitEditor).toContain('Selecciona un archivo.')
-    await page.mouse.click(point.x, point.y)
+    await page.getByText('Selecciona un archivo.').click()
     const editorFocus = await pollUntil(
       () => focusState(app, guestId),
       (state) => state.host && !state.guest,
@@ -456,46 +452,46 @@ it('docks devtools inside the page hole on the right, left, bottom and a separat
 
     await page.locator('[data-browser-devtools]').click()
     const right = await pollUntil(
-      () => pageBox(app, guestId),
-      (box) => box.w < full.w - 20,
+      async () => ({ box: await pageBox(app, guestId), side: await dockSide(app, guestId) }),
+      (state) => state.side === 'right' && state.box.w < full.w - 20,
       'devtools docked right shrinks the page width',
     )
     await assertViewInHost(app, page)
-    const rightSide = await dockSide(app, guestId)
-    expect(rightSide === null || rightSide === 'right', `dock side ${rightSide}`).toBe(true)
+    expect(right.side).toBe('right')
     expect(await windowIds(app)).toEqual(appWindows)
 
     await page.locator('[data-browser-devtools]').click({ button: 'right' })
     await page.getByRole('menuitemradio', { name: 'Izquierda' }).click()
     const left = await pollUntil(
       async () => ({ box: await pageBox(app, guestId), side: await dockSide(app, guestId) }),
-      (state) =>
-        state.box.w < full.w - 20 &&
-        (state.side === 'left' || state.box.screenX > right.screenX + 20),
+      (state) => state.side === 'left' && state.box.w < full.w - 20,
       'devtools docked left splits the page on the other side',
     )
     await assertViewInHost(app, page)
+    expect(left.side).toBe('left')
     expect(left.box.w).toBeLessThan(full.w - 20)
-    expect(left.side === 'left' || left.box.screenX > right.screenX + 20).toBe(true)
 
     await page.locator('[data-browser-devtools]').click({ button: 'right' })
     await page.getByRole('menuitemradio', { name: 'Abajo' }).click()
     const bottom = await pollUntil(
-      () => pageBox(app, guestId),
-      (box) => box.h < full.h - 20 && box.w > full.w - 80,
+      async () => ({ box: await pageBox(app, guestId), side: await dockSide(app, guestId) }),
+      (state) => state.side === 'bottom' && state.box.h < full.h - 20 && state.box.w > full.w - 80,
       'devtools docked bottom shrinks the page height',
     )
     await assertViewInHost(app, page)
-    expect(bottom.h).toBeLessThan(full.h - 20)
+    expect(bottom.side).toBe('bottom')
+    expect(bottom.box.h).toBeLessThan(full.h - 20)
 
     await page.locator('[data-browser-devtools]').click({ button: 'right' })
     await page.getByRole('menuitemradio', { name: 'Ventana separada' }).click()
     const separated = await pollUntil(
       async () => ({
         box: await pageBox(app, guestId),
+        side: await dockSide(app, guestId),
         windows: await windowIds(app),
       }),
       (state) =>
+        state.side === 'undocked' &&
         state.windows.some((id) => !appWindows.includes(id)) &&
         state.box.w > full.w - 40 &&
         state.box.h > full.h - 40,
